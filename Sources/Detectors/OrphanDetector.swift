@@ -37,7 +37,15 @@ public struct OrphanDetector: Detector {
                 memoryBytes: process.residentBytes,
                 age: age,
                 target: .processes([process.pid]),
-                severity: cpu >= 50 ? .urgent : .notable)
+                severity: cpu >= 50 ? .urgent : .notable,
+                explanation: "\(FindingKind.orphan.plainDescription) It came from \(process.executablePath).",
+                revealPath: (process.executablePath as NSString).deletingLastPathComponent,
+                details: """
+                    Orphaned process: \(process.name)
+                    pid \(process.pid)
+                    \(process.executablePath)
+                    \(process.arguments.joined(separator: " "))
+                    """)
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }

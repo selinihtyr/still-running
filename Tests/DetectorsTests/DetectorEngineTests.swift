@@ -9,9 +9,10 @@ import ProcessKit
                          args: ["node", "vite"], ageHours: 9)]
     let containers = [ContainerSample(id: "c1", name: "selene-api", image: "api:latest",
                                       startedAt: Fixtures.now.addingTimeInterval(-22 * 3600))]
+    // Quiet: a dev server doing work is one you are using, and is left alone.
     let result = DetectorEngine().evaluate(
         snapshot: Fixtures.snapshot(processes: processes, containers: containers),
-        history: Fixtures.history(processes, cpuPercent: 30),
+        history: Fixtures.history(processes, cpuPercent: 0),
         settings: Settings(), excluded: [])
 
     #expect(result.findings.contains { $0.kind == .isolatedBrowser })

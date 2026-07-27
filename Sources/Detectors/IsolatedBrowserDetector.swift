@@ -38,9 +38,34 @@ public struct IsolatedBrowserDetector: Detector {
                 memoryBytes: memory,
                 age: age,
                 target: .processes(Self.rootFirst(sorted)),
-                severity: cpu >= 50 ? .urgent : .notable)
+                severity: cpu >= 50 ? .urgent : .notable,
+                explanation: Self.explain(signature: signature, group: group),
+                revealPath: signature.hasPrefix("/") ? signature : nil,
+                details: Self.details(signature: signature, group: sorted))
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
+    }
+
+    /// Says what the profile is and, where the path gives it away, who left it.
+    static func explain(signature: String, group: [ProcessSample]) -> String {
+        let base = FindingKind.isolatedBrowser.plainDescription
+        let count = group.count == 1 ? "one process" : "\(group.count) processes"
+
+        if signature == "headless" {
+            return "\(base) This one is headless, so there is no window to close. \(count.capitalized)."
+        }
+        if signature == "remote-debugging" {
+            return "\(base) It was started with a debugging port open, which is what test and scraping tools do. \(count.capitalized)."
+        }
+        return "\(base) Its profile lives at \(signature), which is where whatever started it put it. \(count.capitalized)."
+    }
+
+    static func details(signature: String, group: [ProcessSample]) -> String {
+        var lines = ["Automation browser", "Profile: \(signature)"]
+        for process in group {
+            lines.append("pid \(process.pid) — \(process.executablePath)")
+        }
+        return lines.joined(separator: "\n")
     }
 
     public static func isBrowser(_ process: ProcessSample) -> Bool {

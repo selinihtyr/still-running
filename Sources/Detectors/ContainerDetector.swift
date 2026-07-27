@@ -23,7 +23,18 @@ public struct ContainerDetector: Detector {
                 memoryBytes: 0,
                 age: age,
                 target: .container(container.id),
-                severity: .notable)
+                severity: .notable,
+                explanation: "\(FindingKind.container.plainDescription) It has been up for \(Formatting.duration(age)) on the \(container.image) image. Stopping it is undoable — it starts again exactly as it was.",
+                revealPath: nil,
+                details: """
+                    Container: \(container.name)
+                    Image: \(container.image)
+                    Id: \(container.id)
+                    Up: \(Formatting.duration(age))
+
+                    docker logs \(container.name)
+                    docker stop \(container.name)
+                    """)
         }
         .sorted { $0.age > $1.age }
     }

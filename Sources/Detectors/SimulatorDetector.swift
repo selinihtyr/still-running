@@ -22,7 +22,16 @@ public struct SimulatorDetector: Detector {
                 memoryBytes: 0,
                 age: age ?? 0,
                 target: .simulator(simulator.id),
-                severity: .notable)
+                severity: .notable,
+                explanation: "\(FindingKind.simulator.plainDescription) This one is running \(simulator.runtime). Shutting it down is undoable — it boots again from the panel.",
+                revealPath: nil,
+                details: """
+                    Simulator: \(simulator.name) (\(simulator.runtime))
+                    UDID: \(simulator.id)
+
+                    xcrun simctl shutdown \(simulator.id)
+                    xcrun simctl boot \(simulator.id)
+                    """)
         }
         .sorted { $0.age > $1.age }
     }

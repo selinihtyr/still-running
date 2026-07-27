@@ -42,6 +42,22 @@ public struct History: Sendable, Equatable {
         return lowest
     }
 
+    /// The busiest interval within `window`, or nil when nothing is recorded
+    /// for it. Evidence that something has been used recently, as opposed to
+    /// merely being old.
+    public func peakCPU(pid: Int32, over window: TimeInterval) -> Double? {
+        guard let newest = snapshots.last, snapshots.count >= 2 else { return nil }
+        let cutoff = newest.takenAt.addingTimeInterval(-window)
+
+        var highest: Double?
+        for index in 1..<snapshots.count {
+            let earlier = snapshots[index - 1], later = snapshots[index]
+            guard later.takenAt > cutoff, let value = interval(from: earlier, to: later, pid: pid) else { continue }
+            highest = max(highest ?? value, value)
+        }
+        return highest
+    }
+
     /// How long CPU has continuously stayed below `threshold`, walking backwards.
     public func idleDuration(pid: Int32, below threshold: Double) -> TimeInterval? {
         guard let newest = snapshots.last, snapshots.count >= 2 else { return nil }

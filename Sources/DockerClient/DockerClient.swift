@@ -57,8 +57,19 @@ public struct DockerClient: Sendable {
 
     public init(socketPath: String) { self.http = UnixSocketHTTP(socketPath: socketPath) }
 
+    /// Every engine that speaks the Docker API, in the order they are most
+    /// likely to be the one in use. Podman, Colima and Rancher all serve the
+    /// same protocol, so supporting them is a matter of knowing where they put
+    /// their socket.
     public static func socketCandidates(home: String = NSHomeDirectory()) -> [String] {
-        ["\(home)/.orbstack/run/docker.sock", "\(home)/.docker/run/docker.sock", "/var/run/docker.sock"]
+        [
+            "\(home)/.orbstack/run/docker.sock",                              // OrbStack
+            "\(home)/.docker/run/docker.sock",                                // Docker Desktop
+            "\(home)/.colima/default/docker.sock",                            // Colima
+            "\(home)/.rd/docker.sock",                                        // Rancher Desktop
+            "\(home)/.local/share/containers/podman/machine/podman.sock",     // Podman
+            "/var/run/docker.sock",
+        ]
     }
 
     /// A client for the first socket that exists, or nil when no daemon is installed.

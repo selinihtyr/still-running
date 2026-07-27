@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Detectors
 import StillRunningCore
 
@@ -25,6 +26,9 @@ struct FindingRow: View {
         .background(hovering ? Color.primary.opacity(0.06) : .clear)
         .contentShape(.rect)
         .onHover { hovering = $0 }
+        // A profile path or a container name is an identifier, not an
+        // explanation. Resting on the row says what the thing actually is.
+        .help(finding.explanation)
     }
 
     private var icon: some View {
@@ -121,6 +125,16 @@ struct FindingRow: View {
     /// rather than as another line of text in the row.
     private var more: some View {
         Menu {
+            if let path = finding.revealPath {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+                }
+            }
+            Button("Copy details") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(finding.details, forType: .string)
+            }
+            Divider()
             Button("Never list this again") { store.keep(finding) }
             if canForce {
                 Button("Force quit now") { Task { await store.forceStop(finding) } }

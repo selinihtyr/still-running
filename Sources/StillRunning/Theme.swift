@@ -19,6 +19,7 @@ enum Theme {
         case .simulator: Color(red: 0.85, green: 0.34, blue: 0.62)       // magenta
         case .isolatedBrowser: Color(red: 0.20, green: 0.56, blue: 0.95) // blue
         case .orphan: Color(red: 0.83, green: 0.56, blue: 0.18)          // ochre
+        case .tunnel: Color(red: 0.86, green: 0.31, blue: 0.34)           // red: an open door
         }
     }
 
@@ -35,6 +36,7 @@ enum Theme {
         case .simulator: "iphone.gen3"
         case .devServer: "terminal.fill"
         case .orphan: "circle.dashed"
+        case .tunnel: "point.3.connected.trianglepath.dotted"
         }
     }
 

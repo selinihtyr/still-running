@@ -47,8 +47,8 @@ public struct DetectorEngine: Sendable {
 
     /// Order matters: the first detector to claim a pid owns it.
     public static var defaultDetectors: [any Detector] {
-        [IsolatedBrowserDetector(), ContainerDetector(), SimulatorDetector(),
-         DevServerDetector(), OrphanDetector()]
+        [TunnelDetector(), IsolatedBrowserDetector(), ContainerDetector(), SimulatorDetector(),
+         AndroidEmulatorDetector(), DevServerDetector(), OrphanDetector()]
     }
 
     public func evaluate(snapshot: Snapshot, history: History,

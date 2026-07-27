@@ -43,10 +43,16 @@ Activity Monitor answers **what is using CPU right now**. Still Running answers
 | | Signal |
 | --- | --- |
 | **Automation browsers** | `--user-data-dir` outside the normal profile, `--headless`, or a remote-debugging port |
-| **Containers** | Docker or OrbStack containers, aged by when the current run started |
-| **Simulators** | Booted simulators, aged from the device's own `launchd_sim` |
+| **Containers** | Docker, OrbStack, Colima, Podman or Rancher, aged by when the current run started |
+| **Simulators** | Booted iOS simulators, and Android emulators named after the device |
 | **Dev servers** | node, bun, deno, vite, next, webpack, metro, astro, uvicorn, gradle daemons, watchman |
+| **Tunnels** | cloudflared, ngrok and friends, with what they're publishing |
 | **Orphans** | Reparented to launchd with no controlling terminal — and not a service launchd manages on purpose |
+
+Every row says what it is if you rest on it, because a profile path or a
+container name is an identifier rather than an explanation. The **⋯** menu
+takes you to it in Finder where there is somewhere to go, and copies the pids,
+paths and commands where there isn't.
 
 Something appears only once it also crosses a threshold: older than two hours,
 or orphaned, or above 25% CPU sustained for three minutes, or idle for half an
@@ -59,7 +65,17 @@ the fans — and says nothing at all while the machine is comfortable.
 
 A dev server is usually several processes — `npm run dev` launches a framework,
 which launches a bundler — so it is reported and stopped as the tree it is,
-named after the project it belongs to.
+named after the project it belongs to. One that has done any real work in the
+last ten minutes is left alone: that is a server you are using, not one you
+forgot.
+
+A tunnel is listed on age alone. Everything else here wastes a core; a tunnel
+you forgot is still publishing a port on your machine to the internet.
+
+**What it deliberately won't offer to stop:** editors and IDEs, and desktop
+virtual machines. Both can hold work that has not been written to disk, and an
+app whose promise is *this is safe to stop* has no business guessing about
+that. They show up under Busy, but yours, with no button.
 
 ## What it will never do
 
@@ -131,7 +147,7 @@ panel and delete `/Applications/Still Running.app`.
 ## Working on it
 
 ```bash
-swift test           # 164 tests, no network, nothing touched
+swift test           # 177 tests, no network, nothing touched
 ./scripts/bundle.sh  # produces build/Still Running.app without installing it
 ```
 

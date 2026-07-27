@@ -55,6 +55,13 @@ public struct DevServerDetector: Detector {
             guard settings.crossesThreshold(age: age, sustainedCPU: sustained,
                                             idleFor: idle, memoryBytes: memory) else { return nil }
 
+            // A dev server that has done real work recently is one you are
+            // using. Age alone would list the server you are typing against.
+            let recentPeak = group
+                .compactMap { history.peakCPU(pid: $0.pid, over: settings.activityWindow) }
+                .max()
+            if let recentPeak, recentPeak >= settings.activeCPUPercent { return nil }
+
             let cpu = totalCPU(group, history)
             return Finding(
                 identity: "devserver:\(seed.executablePath)|\(Self.signature(seed))",
@@ -65,7 +72,11 @@ public struct DevServerDetector: Detector {
                 memoryBytes: memory,
                 age: age,
                 target: .processes(group.pidsRootFirst),
-                severity: cpu >= 50 ? .urgent : .notable)
+                severity: cpu >= 50 ? .urgent : .notable,
+                explanation: Self.explain(group: group, label: label,
+                                          window: settings.activityWindow),
+                revealPath: Self.projectDirectory(in: group),
+                details: Self.details(label: label, group: group))
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }
@@ -87,6 +98,33 @@ public struct DevServerDetector: Detector {
         guard knownExecutables.contains(process.name) else { return nil }
         guard let script = tokens.first(where: { !$0.hasPrefix("-") }) else { return process.name }
         return "\(process.name) · \(script)"
+    }
+
+    static func explain(group: [ProcessSample], label: String, window: TimeInterval) -> String {
+        let minutes = Int(window / 60)
+        let tree = group.count == 1
+            ? "It is a single process."
+            : "It is \(group.count) processes: the command you ran and everything it started."
+        return "\(FindingKind.devServer.plainDescription) \(tree) "
+            + "It has done nothing for at least \(minutes) minutes, which is why it is here — a server you are working against would not be listed."
+    }
+
+    static func details(label: String, group: [ProcessSample]) -> String {
+        var lines = ["Dev server: \(label)"]
+        for process in group {
+            lines.append("pid \(process.pid) — \(process.executablePath) \(process.arguments.dropFirst().joined(separator: " "))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// The project folder this belongs to, for opening in Finder.
+    static func projectDirectory(in group: [ProcessSample]) -> String? {
+        for process in group {
+            for argument in process.arguments where argument.contains("/node_modules/") {
+                return argument.components(separatedBy: "/node_modules/")[0]
+            }
+        }
+        return nil
     }
 
     /// Which project this belongs to, plus how many processes it spans — the

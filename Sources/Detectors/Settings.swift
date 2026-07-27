@@ -8,6 +8,11 @@ public struct Settings: Codable, Sendable, Equatable {
     public var idleCPUPercent: Double = 2
     public var idleWindow: TimeInterval = 1800
     public var idleMemoryBytes: UInt64 = 500 * 1_048_576
+    /// A dev server that did any real work this recently is one you are using,
+    /// not one you forgot. Age alone would list the server you are typing
+    /// against right now.
+    public var activeCPUPercent: Double = 5
+    public var activityWindow: TimeInterval = 600
     /// Opt-in. Nil means no notifications.
     public var notifyAfter: TimeInterval?
 

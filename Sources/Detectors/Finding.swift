@@ -1,7 +1,7 @@
 import Foundation
 
 public enum FindingKind: String, Sendable, Codable, CaseIterable {
-    case isolatedBrowser, container, simulator, devServer, orphan
+    case isolatedBrowser, container, simulator, devServer, orphan, tunnel
 
     public var label: String {
         switch self {
@@ -10,6 +10,26 @@ public enum FindingKind: String, Sendable, Codable, CaseIterable {
         case .simulator: "Simulator"
         case .devServer: "Dev server"
         case .orphan: "Orphaned process"
+        case .tunnel: "Tunnel"
+        }
+    }
+
+    /// What this is, for someone who does not already know. A profile path or
+    /// a container name is an identifier, not an explanation.
+    public var plainDescription: String {
+        switch self {
+        case .isolatedBrowser:
+            "A browser running on its own throwaway profile — started by a script or a tool, not by you. None of your tabs are in it."
+        case .container:
+            "A container that is still running from something you were working on earlier."
+        case .simulator:
+            "A booted simulator. It holds memory and runs a whole device's worth of background processes."
+        case .devServer:
+            "A development server you started and left running, along with everything it started in turn."
+        case .orphan:
+            "Its terminal is gone but it kept running, so launchd adopted it. Nothing will ever clean it up."
+        case .tunnel:
+            "A tunnel publishing something on this machine to the internet, still open long after whoever needed it stopped looking."
         }
     }
 }
@@ -38,12 +58,24 @@ public struct Finding: Sendable, Identifiable, Equatable {
     public let age: TimeInterval
     public let target: StopTarget
     public let severity: Severity
+    /// One plain sentence saying what this thing is, for anyone who does not
+    /// recognise a profile path or a container name on sight.
+    public let explanation: String
+    /// Somewhere on disk this belongs to, if there is one, so the row can take
+    /// you to it rather than only naming it.
+    public let revealPath: String?
+    /// Everything worth pasting into an issue or a terminal.
+    public let details: String
 
     public var id: String { identity }
 
     public init(identity: String, kind: FindingKind, title: String, detail: String,
                 cpuPercent: Double, memoryBytes: UInt64, age: TimeInterval,
-                target: StopTarget, severity: Severity) {
+                target: StopTarget, severity: Severity,
+                explanation: String = "", revealPath: String? = nil, details: String = "") {
+        self.explanation = explanation.isEmpty ? kind.plainDescription : explanation
+        self.revealPath = revealPath
+        self.details = details
         self.identity = identity
         self.kind = kind
         self.title = title
