@@ -108,18 +108,32 @@ switched off for the app — which macOS keeps as a separate switch.
 
 ## Install
 
-Download the DMG from [Releases](../../releases/latest), drag **Still Running**
-to Applications, then **right-click it and choose Open** the first time. The
-build is signed ad-hoc rather than notarised, so Gatekeeper asks once.
-
-## Build from source
+You build it. One command:
 
 ```bash
-swift test           # 160 tests, no network, nothing touched
-./scripts/bundle.sh  # produces build/Still Running.app
+git clone https://github.com/selinihtyr/still-running
+cd still-running && ./scripts/install.sh
 ```
 
-Requires Xcode 26 and macOS 26.
+That builds the app, puts it in `/Applications`, and starts it. Look for the
+ring in your menu bar — there is no Dock icon and no window.
+
+There is no notarised download, because notarising needs a paid Apple developer
+account and this is a free thing I wrote for myself. Building it yourself is
+better anyway: Gatekeeper never gets an opinion, and you can read every line
+that ends up running on your machine.
+
+Requires macOS 26 and Xcode 26.
+
+To update, `git pull && ./scripts/install.sh`. To uninstall, quit it from the
+panel and delete `/Applications/Still Running.app`.
+
+## Working on it
+
+```bash
+swift test           # 164 tests, no network, nothing touched
+./scripts/bundle.sh  # produces build/Still Running.app without installing it
+```
 
 There is a second suite that drives the real machine — it starts a container
 and boots a simulator, stops each through the same code the panel uses, and

@@ -3,6 +3,9 @@ on:
   push:
     tags: ['v*']
 
+# There is no binary to attach: without a paid developer account a download
+# would only be a file macOS warns about. The release marks a tested commit,
+# and people build it themselves — which is the install path anyway.
 jobs:
   release:
     runs-on: macos-26
@@ -12,17 +15,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: swift test
-      - name: Bundle
+      - name: Check it builds and bundles
         run: ./scripts/bundle.sh release
-      - name: Create DMG
-        run: |
-          mkdir -p dmg
-          cp -R "build/Still Running.app" dmg/
-          ln -s /Applications dmg/Applications
-          hdiutil create -volname "Still Running" -srcfolder dmg \
-            -ov -format UDZO "Still-Running.dmg"
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
-          files: Still-Running.dmg
           generate_release_notes: true
+          body: |
+            Install or update:
+
+            ```bash
+            git clone https://github.com/selinihtyr/still-running
+            cd still-running && ./scripts/install.sh
+            ```
+
+            Requires macOS 26 and Xcode 26. There is no download to notarise,
+            so you build it yourself and Gatekeeper stays out of it.
