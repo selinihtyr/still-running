@@ -55,6 +55,21 @@ public final class LiveProcessSource: Sendable {
         return samples
     }
 
+    /// proc_taskinfo reports CPU time in Mach absolute time units, not
+    /// nanoseconds. On Apple Silicon one unit is about 41.67 ns, so reading
+    /// them as nanoseconds makes every percentage roughly forty times too
+    /// small — enough that a process pinning a core reads as 2%.
+    private static let timebase: (numerator: UInt64, denominator: UInt64) = {
+        var info = mach_timebase_info_data_t()
+        guard mach_timebase_info(&info) == KERN_SUCCESS, info.denom > 0 else { return (1, 1) }
+        return (UInt64(info.numer), UInt64(info.denom))
+    }()
+
+    static func nanoseconds(fromMachTicks ticks: UInt64) -> UInt64 {
+        ticks / timebase.denominator * timebase.numerator
+            + ticks % timebase.denominator * timebase.numerator / timebase.denominator
+    }
+
     /// ARGMAX, read once. It does not change while the machine is up.
     private static let argumentMax: Int = {
         var value: Int32 = 0
@@ -97,7 +112,9 @@ public final class LiveProcessSource: Sendable {
             arguments: arguments,
             startedAt: started,
             hasControllingTTY: kp.kp_eproc.e_tdev != -1,
-            cpuTimeNanos: gotInfo ? info.pti_total_user + info.pti_total_system : 0,
+            cpuTimeNanos: gotInfo
+                ? Self.nanoseconds(fromMachTicks: info.pti_total_user + info.pti_total_system)
+                : 0,
             residentBytes: gotInfo ? info.pti_resident_size : 0
         )
     }

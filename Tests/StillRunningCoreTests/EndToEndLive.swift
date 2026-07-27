@@ -108,6 +108,28 @@ private var eager: Settings {
     #expect(kill(ownBrowser.pid, 0) == 0)   // still alive
 }
 
+@Test func aProcessPinningACoreReadsAsPinningACore() async {
+    // The regression this guards: proc_taskinfo reports Mach time units, and
+    // reading them as nanoseconds made a busy loop read as 2%.
+    let burner = Process()
+    burner.executableURL = URL(fileURLWithPath: "/bin/sh")
+    burner.arguments = ["-c", "while :; do :; done"]
+    try? burner.run()
+    defer { burner.terminate() }
+
+    let source = LiveProcessSource()
+    var history = History()
+    history.record(Snapshot(takenAt: Date(), processes: source.processes(), containers: [],
+                            simulators: [], currentUID: getuid(), ownPID: 0))
+    try? await Task.sleep(for: .seconds(2))
+    history.record(Snapshot(takenAt: Date(), processes: source.processes(), containers: [],
+                            simulators: [], currentUID: getuid(), ownPID: 0))
+
+    let measured = history.cpuPercent(pid: burner.processIdentifier)
+    print("busy loop measured at \(Int(measured ?? -1))%")
+    #expect(measured ?? 0 > 50)
+}
+
 @Test func liveSamplingStaysCheap() async {
     let source = LiveSnapshotSource()
     _ = await source.sample()   // warm the caches
