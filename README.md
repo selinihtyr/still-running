@@ -98,6 +98,10 @@ Anything you always keep running can be dismissed for good from the row's
 
 ## Settings
 
+<p align="center">
+  <img src="docs/images/settings.png" width="420" alt="Settings: how long before something counts as forgotten, when to be reminded, and a button that sends a test notification">
+</p>
+
 Two things to set: how long something must run before it counts as forgotten,
 and when to be reminded. Reminders are one quiet notification when something has been running far past
 your threshold, at most once per thing. The test button asks macOS for
