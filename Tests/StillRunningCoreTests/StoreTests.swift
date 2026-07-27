@@ -66,16 +66,52 @@ private func automationSnapshots(cpuPercent: Double = 60) -> [Snapshot] {
             Fixtures.snapshot(processes: advanced, at: Fixtures.now)]
 }
 
+private final class SpyRestarter: Restarting, Sendable {
+    private let calls = Mutex<[String]>([])
+    private let succeeds: Bool
+
+    init(succeeds: Bool = true) { self.succeeds = succeeds }
+
+    var restarted: [String] { calls.withLock { $0 } }
+    func restart(_ finding: Finding) async -> Bool {
+        calls.withLock { $0.append(finding.identity) }
+        return succeeds
+    }
+}
+
 private func cleanDefaults(_ name: String) -> UserDefaults {
     let defaults = UserDefaults(suiteName: name)!
     defaults.removePersistentDomain(forName: name)
     return defaults
 }
 
+/// A store over a browser tree: its findings are processes, which take the
+/// cancellable path.
 @MainActor
-private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> Store {
+private func makeStore(_ name: String, stopper: any Stopping = SpyStopper(),
+                       restarter: any Restarting = SpyRestarter(),
+                       cancellationWindow: TimeInterval = 0.2) -> Store {
     Store(source: ScriptedSource(snapshots: automationSnapshots()),
-          stopper: stopper, defaults: cleanDefaults(name))
+          stopper: stopper, restarter: restarter, defaults: cleanDefaults(name),
+          cancellationWindow: cancellationWindow)
+}
+
+/// A store over containers: its findings stop immediately and can be undone.
+@MainActor
+private func makeContainerStore(_ name: String, stopper: any Stopping = SpyStopper(),
+                                restarter: any Restarting = SpyRestarter()) -> Store {
+    Store(source: ScriptedSource(snapshots: manyContainerSnapshots()),
+          stopper: stopper, restarter: restarter, defaults: cleanDefaults(name))
+}
+
+private func manyContainerSnapshots() -> [Snapshot] {
+    let containers = (1...4).map {
+        ContainerSample(id: "c\($0)", name: "svc-\($0)", image: "img:latest",
+                        startedAt: Fixtures.now.addingTimeInterval(-20 * 3600))
+    }
+    return [Fixtures.snapshot(processes: [], containers: containers,
+                              at: Fixtures.now.addingTimeInterval(-60)),
+            Fixtures.snapshot(processes: [], containers: containers, at: Fixtures.now)]
 }
 
 @MainActor
@@ -92,7 +128,7 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
 @MainActor
 @Test func stopDelegatesToTheStopper() async {
     let spy = SpyStopper()
-    let store = makeStore("store-2", stopper: spy)
+    let store = makeContainerStore("store-2", stopper: spy)
     await store.refresh(); await store.refresh()
 
     await store.stop(store.findings[0])
@@ -103,7 +139,7 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
 
 @MainActor
 @Test func aStillRunningOutcomeMarksTheFindingAsForceable() async {
-    let store = makeStore("store-3", stopper: SpyStopper(outcome: .stillRunning))
+    let store = makeContainerStore("store-3", stopper: SpyStopper(outcome: .stillRunning))
     await store.refresh(); await store.refresh()
     let identity = store.findings[0].identity
 
@@ -114,12 +150,83 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
 
 @MainActor
 @Test func aRefusalSurfacesAsAReadableError() async {
-    let store = makeStore("store-4", stopper: SpyStopper(outcome: .refused(reason: "your browser, with your tabs")))
+    let store = makeContainerStore("store-4", stopper: SpyStopper(outcome: .refused(reason: "your browser, with your tabs")))
     await store.refresh(); await store.refresh()
 
     await store.stop(store.findings[0])
 
     #expect(store.lastError == "Not stopped — your browser, with your tabs.")
+}
+
+@MainActor
+@Test func stoppingAProcessWaitsOutACancellableWindowFirst() async {
+    // A signal cannot be recalled, so the way back comes before it is sent.
+    let spy = SpyStopper()
+    let store = makeStore("store-13", stopper: spy, cancellationWindow: 0.3)
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    await store.stop(finding)
+    #expect(store.pending(finding) != nil)
+    #expect(spy.stopped.isEmpty)
+
+    try? await Task.sleep(for: .milliseconds(500))
+    #expect(spy.stopped.count == 1)
+    #expect(store.pending(finding) == nil)
+}
+
+@MainActor
+@Test func cancellingAPendingStopMeansNoSignalIsEverSent() async {
+    let spy = SpyStopper()
+    let store = makeStore("store-14", stopper: spy, cancellationWindow: 0.4)
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    await store.stop(finding)
+    store.cancelPending(finding)
+    try? await Task.sleep(for: .milliseconds(600))
+
+    #expect(spy.stopped.isEmpty)
+    #expect(store.pending(finding) == nil)
+}
+
+@MainActor
+@Test func aStoppedContainerCanBeStartedAgain() async {
+    let restarter = SpyRestarter()
+    let store = makeContainerStore("store-15", restarter: restarter)
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    await store.stop(finding)
+    #expect(store.undoable.count == 1)
+
+    await store.undo(store.undoable[0])
+
+    #expect(restarter.restarted == [finding.identity])
+    #expect(store.undoable.isEmpty)
+}
+
+@MainActor
+@Test func aStoppedProcessIsNeverOfferedAnUndo() async {
+    // Re-running an argument vector is not the same program in the same state.
+    let store = makeStore("store-16", cancellationWindow: 0.1)
+    await store.refresh(); await store.refresh()
+
+    await store.stop(store.findings[0])
+    try? await Task.sleep(for: .milliseconds(300))
+
+    #expect(store.undoable.isEmpty)
+}
+
+@MainActor
+@Test func aFailedRestartSaysSoInsteadOfPretending() async {
+    let store = makeContainerStore("store-17", restarter: SpyRestarter(succeeds: false))
+    await store.refresh(); await store.refresh()
+
+    await store.stop(store.findings[0])
+    await store.undo(store.undoable[0])
+
+    #expect(store.lastError?.contains("Could not start") == true)
 }
 
 @MainActor
@@ -163,7 +270,7 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
 
 @MainActor
 @Test func onlyTheRowBeingStoppedIsMarkedInFlight() async {
-    let store = makeStore("store-10", stopper: SpyStopper(delay: .milliseconds(120)))
+    let store = makeContainerStore("store-10", stopper: SpyStopper(delay: .milliseconds(120)))
     await store.refresh(); await store.refresh()
     let finding = store.findings[0]
 
@@ -181,8 +288,7 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
     // Sequentially a stack of containers would take the sum of every grace
     // period; Docker waits ten seconds for anything that ignores SIGTERM.
     let spy = SpyStopper(delay: .milliseconds(120))
-    let store = Store(source: ScriptedSource(snapshots: manyContainerSnapshots()),
-                      stopper: spy, defaults: cleanDefaults("store-11"))
+    let store = makeContainerStore("store-11", stopper: spy)
     await store.refresh(); await store.refresh()
     #expect(store.findings.count == 4)
 
@@ -195,7 +301,7 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
 @MainActor
 @Test func aSecondStopOfTheSameRowIsIgnoredWhileTheFirstIsInFlight() async {
     let spy = SpyStopper(delay: .milliseconds(120))
-    let store = makeStore("store-12", stopper: spy)
+    let store = makeContainerStore("store-12", stopper: spy)
     await store.refresh(); await store.refresh()
     let finding = store.findings[0]
 
@@ -205,16 +311,6 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
     await first
 
     #expect(spy.stopped.count == 1)
-}
-
-private func manyContainerSnapshots() -> [Snapshot] {
-    let containers = (1...4).map {
-        ContainerSample(id: "c\($0)", name: "svc-\($0)", image: "img:latest",
-                        startedAt: Fixtures.now.addingTimeInterval(-20 * 3600))
-    }
-    return [Fixtures.snapshot(processes: [], containers: containers,
-                              at: Fixtures.now.addingTimeInterval(-60)),
-            Fixtures.snapshot(processes: [], containers: containers, at: Fixtures.now)]
 }
 
 @MainActor

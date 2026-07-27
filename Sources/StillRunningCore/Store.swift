@@ -12,6 +12,27 @@ public protocol Stopping: Sendable {
 
 extension StopCoordinator: Stopping {}
 
+public protocol Restarting: Sendable {
+    func restart(_ finding: Finding) async -> Bool
+}
+
+extension RestartCoordinator: Restarting {}
+
+/// Something stopped a moment ago that can be put back.
+public struct UndoableStop: Sendable, Identifiable, Equatable {
+    public let finding: Finding
+    public let stoppedAt: Date
+    public var id: String { finding.identity }
+}
+
+/// A stop that has not happened yet. Processes get this instead of an undo,
+/// because a signal cannot be taken back.
+public struct PendingStop: Sendable, Identifiable, Equatable {
+    public let finding: Finding
+    public let firesAt: Date
+    public var id: String { finding.identity }
+}
+
 @MainActor
 @Observable
 public final class Store {
@@ -31,8 +52,21 @@ public final class Store {
         didSet { settingsStore.settings = settings }
     }
 
+    /// Stops that can still be taken back, newest last.
+    public private(set) var undoable: [UndoableStop] = []
+    /// Process stops counting down, which can still be called off.
+    public private(set) var pendingStops: [PendingStop] = []
+
+    /// How long a process stop waits before the signal goes out, and how long
+    /// an undo stays offered afterwards.
+    public let cancellationWindow: TimeInterval
+    public let undoWindow: TimeInterval
+
+    private var countdowns: [String: Task<Void, Never>] = [:]
+
     private let source: any SnapshotSource
     private let stopper: any Stopping
+    private let restarter: any Restarting
     private let engine = DetectorEngine()
     private let settingsStore: SettingsStore
     private var exclusions: Exclusions
@@ -47,15 +81,29 @@ public final class Store {
 
     public init(source: any SnapshotSource = LiveSnapshotSource(),
                 stopper: any Stopping = StopCoordinator(),
+                restarter: any Restarting = RestartCoordinator(),
                 defaults: UserDefaults = .standard,
-                notifier: Notifier = Notifier()) {
+                notifier: Notifier = Notifier(),
+                cancellationWindow: TimeInterval = 3,
+                undoWindow: TimeInterval = 20) {
         let settingsStore = SettingsStore(defaults: defaults)
         self.source = source
         self.stopper = stopper
+        self.restarter = restarter
         self.settingsStore = settingsStore
         self.exclusions = Exclusions(defaults: defaults)
         self.notifier = notifier
+        self.cancellationWindow = cancellationWindow
+        self.undoWindow = undoWindow
         self.settings = settingsStore.settings
+    }
+
+    private func expireUndo(_ identity: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(self.undoWindow))
+            self.undoable.removeAll { $0.id == identity }
+        }
     }
 
     public func refresh() async {
@@ -75,8 +123,58 @@ public final class Store {
 
     public func isStopping(_ finding: Finding) -> Bool { inFlight.contains(finding.identity) }
 
+    public func pending(_ finding: Finding) -> PendingStop? {
+        pendingStops.first { $0.finding.identity == finding.identity }
+    }
+
+    /// Containers and simulators go straight down and can be brought back.
+    /// Processes wait out a short cancellable window first, because once the
+    /// signal is sent there is no way back.
     public func stop(_ finding: Finding) async {
+        guard RestartCoordinator.canRestart(finding) else {
+            schedule(finding)
+            return
+        }
         await stop(finding, thenRefresh: true)
+    }
+
+    /// Starts the countdown for a process. A second call is ignored, so
+    /// double-clicking does not stack two stops.
+    private func schedule(_ finding: Finding) {
+        guard pending(finding) == nil, !inFlight.contains(finding.identity) else { return }
+        let deadline = Date().addingTimeInterval(cancellationWindow)
+        pendingStops.append(PendingStop(finding: finding, firesAt: deadline))
+
+        let window = cancellationWindow
+        countdowns[finding.identity] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(window))
+            guard let self, !Task.isCancelled else { return }
+            self.pendingStops.removeAll { $0.finding.identity == finding.identity }
+            self.countdowns[finding.identity] = nil
+            await self.stop(finding, thenRefresh: true)
+        }
+    }
+
+    /// Takes back a stop that has not fired yet.
+    public func cancelPending(_ finding: Finding) {
+        countdowns[finding.identity]?.cancel()
+        countdowns[finding.identity] = nil
+        pendingStops.removeAll { $0.finding.identity == finding.identity }
+    }
+
+    /// Starts a stopped container or simulator again.
+    public func undo(_ stop: UndoableStop) async {
+        undoable.removeAll { $0.id == stop.id }
+        if await restarter.restart(stop.finding) {
+            lastError = nil
+        } else {
+            lastError = "Could not start \(stop.finding.title) again."
+        }
+        await refresh()
+    }
+
+    public func dismissUndo(_ stop: UndoableStop) {
+        undoable.removeAll { $0.id == stop.id }
     }
 
     private func stop(_ finding: Finding, thenRefresh: Bool) async {
@@ -88,6 +186,10 @@ public final class Store {
         case .stopped:
             forceableIdentities.remove(finding.identity)
             lastError = nil
+            if RestartCoordinator.canRestart(finding) {
+                undoable.append(UndoableStop(finding: finding, stoppedAt: Date()))
+                expireUndo(finding.identity)
+            }
         case .stillRunning:
             forceableIdentities.insert(finding.identity)
         case .refused(let reason):

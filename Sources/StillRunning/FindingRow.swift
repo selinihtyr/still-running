@@ -85,7 +85,21 @@ struct FindingRow: View {
 
     @ViewBuilder private var action: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            if store.isStopping(finding) {
+            if let pending = store.pending(finding) {
+                // A signal cannot be recalled, so the way back comes before it
+                // rather than after.
+                HStack(spacing: 6) {
+                    TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                        let left = max(0, Int(pending.firesAt.timeIntervalSince(context.date).rounded(.up)))
+                        Text("in \(left)s")
+                            .font(.figure)
+                            .foregroundStyle(.orange)
+                    }
+                    Button("Cancel") { store.cancelPending(finding) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+            } else if store.isStopping(finding) {
                 // Only this row waits. A container that ignores SIGTERM keeps
                 // Docker busy for ten seconds; the rest of the panel stays live.
                 HStack(spacing: 5) {

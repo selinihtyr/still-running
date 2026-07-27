@@ -30,6 +30,7 @@ struct PanelView: View {
                 stopAll
             }
 
+            undoStrip
             AlsoHotSection(processes: store.alsoHot)
 
             Divider()
@@ -171,6 +172,38 @@ struct PanelView: View {
             .sorted { $0.key.rawValue < $1.key.rawValue }
             .map { kind, count in "\(count) \(kind.label.lowercased())\(count == 1 ? "" : "s")" }
         return parts.joined(separator: ", ") + " will be stopped."
+    }
+
+    /// Stopped containers and simulators linger here for a moment so a wrong
+    /// click can be taken back. Processes never appear: they cannot be started
+    /// again as the same thing, so they get a countdown before the signal.
+    @ViewBuilder private var undoStrip: some View {
+        if !store.undoable.isEmpty {
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                Text("JUST STOPPED")
+                    .font(.eyebrow)
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                ForEach(store.undoable) { stopped in
+                    HStack(spacing: 8) {
+                        Image(systemName: Theme.icon(for: stopped.finding.kind))
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.tint(for: stopped.finding.kind))
+                        Text(stopped.finding.title)
+                            .font(.rowDetail)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        Button("Start again") { Task { await store.undo(stopped) } }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
     }
 
     private var footer: some View {

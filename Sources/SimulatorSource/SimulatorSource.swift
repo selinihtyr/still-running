@@ -15,6 +15,7 @@ public struct BootedSimulator: Sendable, Equatable {
 public protocol SimulatorControl: Sendable {
     func booted() async throws -> [BootedSimulator]
     func shutdown(udid: String) async throws
+    func boot(udid: String) async throws
 }
 
 /// simctl is the only supported interface to CoreSimulator, so this is the one
@@ -32,6 +33,11 @@ public struct SimctlSource: SimulatorControl {
 
     public func shutdown(udid: String) async throws {
         _ = try run(["simctl", "shutdown", udid])
+    }
+
+    /// Boots a device again, so shutting one down can be taken back.
+    public func boot(udid: String) async throws {
+        _ = try run(["simctl", "boot", udid])
     }
 
     static func decodeBooted(_ data: Data) throws -> [BootedSimulator] {

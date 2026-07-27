@@ -7,8 +7,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let ageChoices: [(label: String, value: TimeInterval)] = [
-        ("30 minutes", 1800), ("1 hour", 3600), ("2 hours", 7200),
-        ("4 hours", 14_400), ("8 hours", 28_800),
+        ("5 minutes", 300), ("15 minutes", 900), ("30 minutes", 1800),
+        ("1 hour", 3600), ("2 hours", 7200), ("4 hours", 14_400), ("8 hours", 28_800),
     ]
     private let notifyChoices: [(label: String, value: TimeInterval?)] = [
         ("Never", nil), ("After 4 hours", 14_400), ("After 8 hours", 28_800),

@@ -108,6 +108,16 @@ public struct DockerClient: Sendable {
         }
     }
 
+    /// Starts a stopped container again. This is what makes stopping a
+    /// container genuinely undoable rather than merely reversible in principle.
+    public func start(id: String) async throws {
+        let response = try await http.send(method: "POST", path: "/\(Self.apiVersion)/containers/\(id)/start")
+        // 204 started, 304 already running.
+        guard response.status == 204 || response.status == 304 else {
+            throw HTTPError.status(response.status, String(decoding: response.body, as: UTF8.self))
+        }
+    }
+
     static func decodeContainers(_ data: Data) throws -> [DockerContainer] {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970

@@ -8,6 +8,7 @@ private struct StubSimulators: SimulatorControl {
     let devices: [BootedSimulator]
     func booted() async throws -> [BootedSimulator] { devices }
     func shutdown(udid: String) async throws {}
+    func boot(udid: String) async throws {}
 }
 
 @Test func resolvesSimulatorBootTimeFromItsLaunchdProcess() {
