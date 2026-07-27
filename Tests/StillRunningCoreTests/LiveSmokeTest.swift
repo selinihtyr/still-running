@@ -14,7 +14,13 @@ import ProcessKit
     let latest = await source.sample()
     history.record(latest)
 
-    let result = DetectorEngine().evaluate(in: latest, history: history)
+    // Read the settings the installed app is actually running with, so this
+    // reports what the panel shows rather than what the defaults would show.
+    let installed = UserDefaults(suiteName: "social.selin.stillrunning")
+        .map { SettingsStore(defaults: $0).settings } ?? Settings()
+    print("threshold: \(Int(installed.minimumAge))s")
+    let result = DetectorEngine().evaluate(snapshot: latest, history: history,
+                                           settings: installed, excluded: [])
 
     print("--- findings ---")
     for finding in result.findings {
