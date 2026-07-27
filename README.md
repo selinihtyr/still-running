@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing a dev server, an automation browser, and six containers, each with how long it has been running">
+  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing a dev server, an automation browser, and five containers, each with how long it has been running">
 </p>
 
 <p align="center">
@@ -117,11 +117,20 @@ build is signed ad-hoc rather than notarised, so Gatekeeper asks once.
 ## Build from source
 
 ```bash
-swift test          # unit tests: no network, no side effects
-./scripts/bundle.sh # produces build/Still Running.app
+swift test           # 160 tests, no network, nothing touched
+./scripts/bundle.sh  # produces build/Still Running.app
 ```
 
 Requires Xcode 26 and macOS 26.
+
+There is a second suite that drives the real machine — it starts a container
+and boots a simulator, stops each through the same code the panel uses, and
+puts them back. It is off unless asked for, so a plain `swift test` and CI
+leave the system alone:
+
+```bash
+STILL_RUNNING_LIVE_TESTS=1 swift test
+```
 
 ## How it works
 

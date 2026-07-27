@@ -9,8 +9,14 @@ import ProcessKit
 import SimulatorSource
 
 /// Drives the real machine: creates its own targets, stops them through the
-/// same code the panel uses, and puts them back. Temporary — it has side
-/// effects and must never run in CI.
+/// same code the panel uses, and puts them back.
+///
+/// These start containers and boot simulators, so they are off unless asked
+/// for: `STILL_RUNNING_LIVE_TESTS=1 swift test`. A plain `swift test` — the one
+/// CI runs, on a machine with no Docker and no Xcode devices — leaves the
+/// system untouched.
+private let liveTestsRequested =
+    ProcessInfo.processInfo.environment["STILL_RUNNING_LIVE_TESTS"] == "1"
 private func shell(_ command: String) -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/zsh")
@@ -34,7 +40,7 @@ private var eager: Settings {
     return settings
 }
 
-@Test func liveContainerStopsAndStartsAgain() async {
+@Test(.enabled(if: liveTestsRequested)) func liveContainerStopsAndStartsAgain() async {
     _ = shell("docker rm -f e2e-container 2>/dev/null; docker run -d --name e2e-container alpine sleep 600; sleep 1")
     defer { _ = shell("docker rm -f e2e-container") }
 
@@ -52,7 +58,7 @@ private var eager: Settings {
     #expect(shell("docker inspect -f '{{.State.Running}}' e2e-container") == "true")
 }
 
-@Test func liveSimulatorShutsDownAndBootsAgain() async {
+@Test(.enabled(if: liveTestsRequested)) func liveSimulatorShutsDownAndBootsAgain() async {
     let udid = shell("xcrun simctl list devices available -j | python3 -c \"import json,sys;d=json.load(sys.stdin);print([x['udid'] for v in d['devices'].values() for x in v if 'iPhone' in x['name']][0])\"")
     guard !udid.isEmpty else { return }   // no simulators installed: nothing to prove
 
