@@ -17,7 +17,10 @@ extension StopCoordinator: Stopping {}
 public final class Store {
     public private(set) var findings: [Finding] = []
     public private(set) var alsoHot: [HotProcess] = []
-    public private(set) var isBusy = false
+    /// Identities with a stop in flight. Stopping is per row, not global: a
+    /// container that ignores SIGTERM keeps Docker waiting out its ten second
+    /// grace period, and that must not freeze every other button.
+    public private(set) var inFlight: Set<String> = []
     /// Findings that survived a graceful stop and may be force quit.
     public private(set) var forceableIdentities: Set<String> = []
     public private(set) var lastError: String?
@@ -70,10 +73,16 @@ public final class Store {
         notifier.consider(findings, settings: settings)
     }
 
+    public func isStopping(_ finding: Finding) -> Bool { inFlight.contains(finding.identity) }
+
     public func stop(_ finding: Finding) async {
-        guard let snapshot = latest else { return }
-        isBusy = true
-        defer { isBusy = false }
+        await stop(finding, thenRefresh: true)
+    }
+
+    private func stop(_ finding: Finding, thenRefresh: Bool) async {
+        guard let snapshot = latest, !inFlight.contains(finding.identity) else { return }
+        inFlight.insert(finding.identity)
+        defer { inFlight.remove(finding.identity) }
 
         switch await stopper.stop(finding, in: snapshot) {
         case .stopped:
@@ -86,13 +95,23 @@ public final class Store {
         case .failed(let message):
             lastError = "Could not stop: \(message)"
         }
+        if thenRefresh { await refresh() }
+    }
+
+    /// Stops everything at once. Sequentially this would be the sum of every
+    /// grace period, which for a stack of containers is over a minute.
+    public func stopAll() async {
+        let running = findings.map { finding in
+            Task { await self.stop(finding, thenRefresh: false) }
+        }
+        for task in running { await task.value }
         await refresh()
     }
 
     public func forceStop(_ finding: Finding) async {
-        guard let snapshot = latest else { return }
-        isBusy = true
-        defer { isBusy = false }
+        guard let snapshot = latest, !inFlight.contains(finding.identity) else { return }
+        inFlight.insert(finding.identity)
+        defer { inFlight.remove(finding.identity) }
 
         _ = await stopper.forceStop(finding, in: snapshot)
         forceableIdentities.remove(finding.identity)

@@ -6,6 +6,7 @@ import StillRunningCore
 struct PanelView: View {
     @Bindable var store: Store
     @Environment(\.openWindow) private var openWindow
+    @State private var confirmingStopAll = false
 
     private var longestAge: TimeInterval { store.findings.map(\.age).max() ?? 0 }
 
@@ -120,19 +121,56 @@ struct PanelView: View {
         .padding(.bottom, 4)
     }
 
+    /// Bulk stopping asks first, and asks in place. A confirmation dialog
+    /// presented from a menu bar window dies with the window the moment focus
+    /// moves, so the button becomes the question and waits for a second press.
     private var stopAll: some View {
-        Button {
-            Task { for finding in store.findings { await store.stop(finding) } }
-        } label: {
-            Text("Stop all \(store.findings.count)")
-                .frame(maxWidth: .infinity)
+        VStack(spacing: 6) {
+            Button {
+                if confirmingStopAll {
+                    confirmingStopAll = false
+                    Task { await store.stopAll() }
+                } else {
+                    confirmingStopAll = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(5))
+                        confirmingStopAll = false
+                    }
+                }
+            } label: {
+                Text(stopAllLabel).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(confirmingStopAll ? .orange : .accentColor)
+            .disabled(!store.inFlight.isEmpty)
+
+            if confirmingStopAll {
+                Text(stopAllConsequence)
+                    .font(.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(store.isBusy)
         .padding(.horizontal, 12)
         .padding(.top, 12)
         .padding(.bottom, 4)
+    }
+
+    private var stopAllLabel: String {
+        if !store.inFlight.isEmpty { return "Stopping \(store.inFlight.count)…" }
+        return confirmingStopAll
+            ? "Yes, stop all \(store.findings.count)"
+            : "Stop all \(store.findings.count)"
+    }
+
+    private var stopAllConsequence: String {
+        let counts = Dictionary(grouping: store.findings, by: \.kind).mapValues(\.count)
+        let parts = counts
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { kind, count in "\(count) \(kind.label.lowercased())\(count == 1 ? "" : "s")" }
+        return parts.joined(separator: ", ") + " will be stopped."
     }
 
     private var footer: some View {

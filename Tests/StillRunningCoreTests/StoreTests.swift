@@ -24,15 +24,25 @@ private final class ScriptedSource: SnapshotSource {
 
 private final class SpyStopper: Stopping, Sendable {
     private let calls = Mutex<(stopped: [String], forced: [String])>((stopped: [], forced: []))
+    private let concurrency = Mutex<(current: Int, peak: Int)>((current: 0, peak: 0))
     private let plannedOutcome: StopOutcome
+    private let delay: Duration
 
-    init(outcome: StopOutcome = .stopped) { self.plannedOutcome = outcome }
+    init(outcome: StopOutcome = .stopped, delay: Duration = .zero) {
+        self.plannedOutcome = outcome
+        self.delay = delay
+    }
 
     var stopped: [String] { calls.withLock { $0.stopped } }
     var forced: [String] { calls.withLock { $0.forced } }
+    /// How many stops were ever in flight at the same time.
+    var peakConcurrency: Int { concurrency.withLock { $0.peak } }
 
     func stop(_ finding: Finding, in snapshot: Snapshot) async -> StopOutcome {
         calls.withLock { $0.stopped.append(finding.identity) }
+        concurrency.withLock { $0.current += 1; $0.peak = max($0.peak, $0.current) }
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        concurrency.withLock { $0.current -= 1 }
         return plannedOutcome
     }
 
@@ -149,6 +159,62 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper()) -> 
     await second.refresh(); await second.refresh()
 
     #expect(second.findings.isEmpty)
+}
+
+@MainActor
+@Test func onlyTheRowBeingStoppedIsMarkedInFlight() async {
+    let store = makeStore("store-10", stopper: SpyStopper(delay: .milliseconds(120)))
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    let task = Task { await store.stop(finding) }
+    try? await Task.sleep(for: .milliseconds(40))
+    #expect(store.isStopping(finding))
+
+    await task.value
+    #expect(!store.isStopping(finding))
+    #expect(store.inFlight.isEmpty)
+}
+
+@MainActor
+@Test func stopAllRunsConcurrentlyRatherThanOneAfterAnother() async {
+    // Sequentially a stack of containers would take the sum of every grace
+    // period; Docker waits ten seconds for anything that ignores SIGTERM.
+    let spy = SpyStopper(delay: .milliseconds(120))
+    let store = Store(source: ScriptedSource(snapshots: manyContainerSnapshots()),
+                      stopper: spy, defaults: cleanDefaults("store-11"))
+    await store.refresh(); await store.refresh()
+    #expect(store.findings.count == 4)
+
+    await store.stopAll()
+
+    #expect(spy.stopped.count == 4)
+    #expect(spy.peakConcurrency == 4)
+}
+
+@MainActor
+@Test func aSecondStopOfTheSameRowIsIgnoredWhileTheFirstIsInFlight() async {
+    let spy = SpyStopper(delay: .milliseconds(120))
+    let store = makeStore("store-12", stopper: spy)
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    async let first: Void = store.stop(finding)
+    try? await Task.sleep(for: .milliseconds(30))
+    await store.stop(finding)
+    await first
+
+    #expect(spy.stopped.count == 1)
+}
+
+private func manyContainerSnapshots() -> [Snapshot] {
+    let containers = (1...4).map {
+        ContainerSample(id: "c\($0)", name: "svc-\($0)", image: "img:latest",
+                        startedAt: Fixtures.now.addingTimeInterval(-20 * 3600))
+    }
+    return [Fixtures.snapshot(processes: [], containers: containers,
+                              at: Fixtures.now.addingTimeInterval(-60)),
+            Fixtures.snapshot(processes: [], containers: containers, at: Fixtures.now)]
 }
 
 @MainActor

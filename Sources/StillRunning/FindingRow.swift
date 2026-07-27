@@ -85,22 +85,33 @@ struct FindingRow: View {
 
     @ViewBuilder private var action: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            if canForce {
+            if store.isStopping(finding) {
+                // Only this row waits. A container that ignores SIGTERM keeps
+                // Docker busy for ten seconds; the rest of the panel stays live.
+                HStack(spacing: 5) {
+                    ProgressView().controlSize(.small).scaleEffect(0.7)
+                    Text("Stopping")
+                        .font(.rowDetail)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(height: 20)
+            } else if canForce {
                 Button("Force quit") { Task { await store.forceStop(finding) } }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .tint(.orange)
             } else {
                 Button(stopVerb) { Task { await store.stop(finding) } }
-                    .disabled(store.isBusy)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
-            if hovering {
+            if hovering && !store.isStopping(finding) {
                 Button("Keep") { store.keep(finding) }
                     .buttonStyle(.plain)
                     .font(.rowDetail)
                     .foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     /// The signature of the panel: how long this has been alive, drawn against
