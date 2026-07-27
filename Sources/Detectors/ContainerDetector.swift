@@ -1,0 +1,30 @@
+import Foundation
+import ProcessKit
+
+/// Containers left up from a project you stopped working on. The Engine API has
+/// no cheap per-container CPU reading, so age carries the decision — which is
+/// the right rule here: a container up for a day is exactly the target.
+public struct ContainerDetector: Detector {
+    public let kind: FindingKind = .container
+
+    public init() {}
+
+    public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
+        snapshot.containers.compactMap { container -> Finding? in
+            let age = snapshot.takenAt.timeIntervalSince(container.startedAt)
+            guard age >= settings.minimumAge else { return nil }
+
+            return Finding(
+                identity: "container:\(container.name)",
+                kind: .container,
+                title: "\(container.name) · container",
+                detail: "up \(Formatting.duration(age)) · \(container.image)",
+                cpuPercent: 0,
+                memoryBytes: 0,
+                age: age,
+                target: .container(container.id),
+                severity: .notable)
+        }
+        .sorted { $0.age > $1.age }
+    }
+}
