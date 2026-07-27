@@ -29,7 +29,10 @@ public struct IsolatedBrowserDetector: Detector {
             return Finding(
                 identity: "browser:\(signature)",
                 kind: .isolatedBrowser,
-                title: "\(Self.browserName(root)) · automation profile",
+                // The profile path in the detail line says the rest; a longer
+                // title only gets truncated in the middle, which reads worse
+                // than saying less.
+                title: "\(Self.shortBrowserName(root)) · automation",
                 detail: signature,
                 cpuPercent: cpu,
                 memoryBytes: memory,
@@ -84,6 +87,13 @@ public struct IsolatedBrowserDetector: Detector {
 
     static func browserName(_ process: ProcessSample) -> String {
         browserMarkers.first { process.executablePath.contains($0) } ?? process.name
+    }
+
+    /// "Google Chrome" reads as "Chrome" in a narrow row; the vendor adds
+    /// nothing the user needs.
+    static func shortBrowserName(_ process: ProcessSample) -> String {
+        let full = browserName(process)
+        return full.hasPrefix("Google ") ? String(full.dropFirst("Google ".count)) : full
     }
 
     /// The profile path when it is outside the standard location, a marker when

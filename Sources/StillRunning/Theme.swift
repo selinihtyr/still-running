@@ -5,7 +5,7 @@ import Detectors
 /// something actively burning CPU. Nothing else is tinted, so amber always
 /// means the same thing at a glance.
 enum Theme {
-    static let panelWidth: CGFloat = 360
+    static let panelWidth: CGFloat = 390
     static let rowSpacing: CGFloat = 10
     static let cardRadius: CGFloat = 11
 

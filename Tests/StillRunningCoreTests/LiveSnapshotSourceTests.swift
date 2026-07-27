@@ -45,13 +45,19 @@ private struct StubSimulators: SimulatorControl {
     #expect(!snapshot.processes.isEmpty)
 }
 
-@Test func simulatorsWithoutALaunchdProcessStillAppear() async {
-    let source = LiveSnapshotSource(
-        docker: nil,
-        simulators: StubSimulators(devices: [
-            BootedSimulator(udid: "NOT-RUNNING", name: "iPhone 17", runtime: "iOS 26.5")]))
-    let snapshot = await source.sample()
+@Test func simctlIsOnlyConsultedWhenADeviceIsActuallyBooted() {
+    // Spawning simctl is the most expensive part of a sample, and a booted
+    // device always leaves a launchd_sim behind.
+    let ordinary = ProcessSample(
+        pid: 100, ppid: 1, uid: 501, executablePath: "/usr/bin/thing", arguments: ["thing"],
+        startedAt: Date(), hasControllingTTY: false, cpuTimeNanos: 0, residentBytes: 0)
+    let launchdSim = ProcessSample(
+        pid: 200, ppid: 1, uid: 501,
+        executablePath: "/Library/Developer/CoreSimulator/…/sbin/launchd_sim",
+        arguments: ["launchd_sim"], startedAt: Date(), hasControllingTTY: false,
+        cpuTimeNanos: 0, residentBytes: 0)
 
-    #expect(snapshot.simulators.count == 1)
-    #expect(snapshot.simulators[0].bootedAt == nil)
+    #expect(LiveSnapshotSource.hasBootedSimulator(in: [ordinary]) == false)
+    #expect(LiveSnapshotSource.hasBootedSimulator(in: [ordinary, launchdSim]) == true)
+    #expect(LiveSnapshotSource.hasBootedSimulator(in: []) == false)
 }

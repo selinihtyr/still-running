@@ -47,15 +47,19 @@ public struct LiveSnapshotSource: SnapshotSource {
     }
 
     private func simulatorSamples(processes samples: [ProcessSample]) async -> [SimulatorSample] {
-        // Spawning simctl costs about eighty milliseconds. A booted device
-        // always runs a launchd_sim, so when there is none there is nothing to
-        // ask about — which is the common case, every few seconds, forever.
-        guard samples.contains(where: { $0.name == "launchd_sim" }) else { return [] }
+        guard Self.hasBootedSimulator(in: samples) else { return [] }
         guard let devices = try? await simulators.booted() else { return [] }
         return devices.map {
             SimulatorSample(id: $0.udid, name: $0.name, runtime: $0.runtime,
                             bootedAt: Self.bootTime(forSimulator: $0.udid, in: samples))
         }
+    }
+
+    /// Spawning simctl costs about eighty milliseconds, every few seconds,
+    /// forever. A booted device always runs a launchd_sim, so when there is
+    /// none there is nothing to ask about — which is the common case.
+    static func hasBootedSimulator(in processes: [ProcessSample]) -> Bool {
+        processes.contains { $0.name == "launchd_sim" }
     }
 
     /// simctl does not report boot time, but every booted device runs a

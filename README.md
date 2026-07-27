@@ -11,16 +11,24 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing a dev server, an automation browser, and six containers, each with how long it has been running">
+</p>
+
+<p align="center">
+  <sub>Lives in the menu bar. No Dock icon, no window, no account, no login item.</sub>
+</p>
+
 ## Why
 
 A laptop got hot. The cause turned out to be a headless Chrome, started by a
 tool, running for eighteen hours on a throwaway profile, burning most of a core
-the whole time. Nothing in Activity Monitor said "you forgot about this one" —
+the whole time. Nothing in Activity Monitor said *you forgot about this one* —
 it just showed a browser near the top of a list, next to the browser actually
 in use.
 
-Activity Monitor answers *what is using CPU right now*. Still Running answers
-*which of these did I forget about, and is it safe to stop*.
+Activity Monitor answers **what is using CPU right now**. Still Running answers
+**which of these did I forget about, and is it safe to stop**.
 
 ## What it finds
 
@@ -29,30 +37,34 @@ Activity Monitor answers *what is using CPU right now*. Still Running answers
 | **Automation browsers** | `--user-data-dir` outside the normal profile, `--headless`, or a remote-debugging port |
 | **Containers** | Docker or OrbStack containers, aged by when the current run started |
 | **Simulators** | Booted simulators, aged from the device's own `launchd_sim` |
-| **Dev servers** | node, bun, deno, vite, next, webpack, metro, uvicorn, gradle daemons, watchman |
+| **Dev servers** | node, bun, deno, vite, next, webpack, metro, astro, uvicorn, gradle daemons, watchman |
 | **Orphans** | Reparented to launchd with no controlling terminal — and not a service launchd manages on purpose |
 
 Something appears only once it also crosses a threshold: older than two hours,
 or orphaned, or above 25% CPU sustained for three minutes, or idle for half an
-hour while holding more than 500 MB. All four are adjustable.
+hour while holding more than 500 MB. All of them are adjustable.
 
 Rates come from a rolling five-minute history rather than a single reading, so
 a brief spike never puts anything on the list.
+
+A dev server is usually several processes — `npm run dev` launches a framework,
+which launches a bundler — so it is reported and stopped as the tree it is,
+named after the project it belongs to.
 
 ## What it will never do
 
 - **Never deletes anything.** It stops things.
 - **Never touches your browser's own tabs.** Only isolated and automation
   profiles are ever offered. A browser on its normal profile is refused at two
-  separate layers.
-- **Never force quits on its own.** The first click sends SIGTERM. Force quit is
-  a second, separate, explicitly labelled click that appears only if the first
-  one was ignored.
-- **Never asks for privileges.** No root, no Accessibility, no Full Disk Access,
-  no login item. It reads the process table, which any process may do.
+  separate layers, and there is a test that proves it on a live machine.
+- **Never force quits on its own.** The first click sends SIGTERM. Force quit
+  is a separate, explicitly labelled action that appears only if the first one
+  was ignored.
+- **Never asks for privileges.** No root, no Accessibility, no Full Disk
+  Access, no login item. It reads the process table, which any process may do.
 
-Processes it cannot vouch for appear under "Busy, but yours" — visible, but with
-no button next to them.
+Processes it cannot vouch for appear under **Busy, but yours** — visible, but
+with no button next to them.
 
 ## Getting it wrong
 
@@ -69,18 +81,30 @@ cancelled before anything is sent.
 
 **Stop all** asks before it acts, and lists what will go.
 
+Anything you always keep running can be dismissed for good from the row's
+**⋯** menu. It goes on running; it just stops being mentioned.
+
+## Settings
+
+<p align="center">
+  <img src="docs/images/settings.png" width="420" alt="Settings: how long before something counts as forgotten, when to be reminded, and a button that sends a test notification">
+</p>
+
+Reminders are one quiet notification when something has been running far past
+your threshold, at most once per thing. The test button asks macOS for
+permission and reports back exactly what it allows, including whether sound is
+switched off for the app — which macOS keeps as a separate switch.
+
 ## Install
 
 Download the DMG from [Releases](../../releases/latest), drag **Still Running**
 to Applications, then **right-click it and choose Open** the first time. The
 build is signed ad-hoc rather than notarised, so Gatekeeper asks once.
 
-It lives in the menu bar. There is no Dock icon and no window.
-
 ## Build from source
 
 ```bash
-swift test          # 138 tests, no network, no side effects
+swift test          # unit tests: no network, no side effects
 ./scripts/bundle.sh # produces build/Still Running.app
 ```
 
@@ -90,13 +114,21 @@ Requires Xcode 26 and macOS 26.
 
 `ProcessKit` samples the process table through `sysctl` and `libproc` into a
 serialisable `Snapshot`. `DockerClient` adds containers by speaking HTTP over
-the Docker unix socket, and `SimulatorSource` adds simulators through `simctl`.
+the Docker unix socket. `SimulatorSource` adds simulators through `simctl`.
 `Detectors` turns a snapshot plus rolling history into findings, and `Actions`
 stops them behind a safety guard that no other code path can bypass.
 
 Because a snapshot is just data, every rule is tested against recorded fixtures
 of real machine states — including the one where the user's own Chrome must not
 be flagged while an automation Chrome beside it must be.
+
+**It stays out of the way.** A sample costs about 115 ms and runs every five
+seconds while the panel is open, once a minute while it is closed. Getting
+there took work: reading every process's arguments meant a megabyte-sized
+buffer per process, which cost 614 ms per sweep. Arguments cannot change while
+a process lives, so they are cached against its start time; container start
+times are inspected once; and `simctl`, the most expensive call of all, is only
+spawned when a booted device's `launchd_sim` is actually there.
 
 ## License
 
