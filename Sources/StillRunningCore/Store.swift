@@ -71,6 +71,7 @@ public final class Store {
     private let restarter: any Restarting
     private let engine = DetectorEngine()
     private let settingsStore: SettingsStore
+    private let defaults: UserDefaults
     private var exclusions: Exclusions
     private var notifier: Notifier
     private var history = History()
@@ -93,11 +94,28 @@ public final class Store {
         self.stopper = stopper
         self.restarter = restarter
         self.settingsStore = settingsStore
+        self.defaults = defaults
         self.exclusions = Exclusions(defaults: defaults)
         self.notifier = notifier
         self.cancellationWindow = cancellationWindow
         self.undoWindow = undoWindow
         self.settings = settingsStore.settings
+    }
+
+    /// First launch after install: ask macOS for notification permission, and
+    /// turn reminders on so that permission is worth something. Asking for a
+    /// permission the app then never uses would be a worse first impression
+    /// than not asking at all.
+    public func prepareFirstRun() {
+        let key = "hasLaunchedBefore"
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+
+        var updated = settings
+        updated.notifyAfter = 8 * 3600
+        settings = updated
+
+        notifier.requestAuthorization()
     }
 
     private func expireUndo(_ identity: String) {

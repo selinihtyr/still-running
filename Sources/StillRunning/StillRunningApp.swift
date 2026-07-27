@@ -18,7 +18,10 @@ struct StillRunningApp: App {
             // only view that always exists, so the badge is right before the
             // user has ever opened anything.
             Color.clear.frame(width: 0, height: 0)
-                .task { store.startSampling() }
+                .task {
+                    store.prepareFirstRun()
+                    store.startSampling()
+                }
         }
         .menuBarExtraStyle(.window)
 

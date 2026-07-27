@@ -23,7 +23,9 @@ struct FindingRow: View {
                 figures
                 action
             }
-            durationRail
+            // With a single finding there is nothing to compare against, and a
+            // lone bar reads as a progress bar rather than a scale.
+            if showsRail { durationRail }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
@@ -120,12 +122,19 @@ struct FindingRow: View {
                     .controlSize(.small)
             }
             if hovering && !store.isStopping(finding) {
-                Button("Keep") { store.keep(finding) }
+                Button("Ignore") { store.keep(finding) }
                     .buttonStyle(.plain)
                     .font(.rowDetail)
                     .foregroundStyle(.secondary)
+                    .help("Never list this again. It keeps running — this only stops the reminder.")
             }
         }
+    }
+
+    private var showsRail: Bool { store.findings.count > 1 && longestAge > 0 }
+
+    private var railExplanation: String {
+        "Running \(Formatting.duration(finding.age)). The bar compares that with the longest on this list, \(Formatting.duration(longestAge))."
     }
 
     /// The signature of the panel: how long this has been alive, drawn against
@@ -145,6 +154,7 @@ struct FindingRow: View {
         .frame(height: 3)
         .padding(.leading, 34)
         .animation(.smooth(duration: 0.4), value: finding.age)
+        .help(railExplanation)
     }
 
     private var stopVerb: String {

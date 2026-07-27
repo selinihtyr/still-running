@@ -4,10 +4,15 @@ import Synchronization
 @testable import StillRunningCore
 import Detectors
 
-private final class RecordingPresenter: NotificationPresenting, Sendable {
+final class RecordingPresenter: NotificationPresenting, Sendable {
     private let storage = Mutex<[String]>([])
+    private let authorizationRequests = Mutex<Int>(0)
+
     var messages: [String] { storage.withLock { $0 } }
+    var timesAsked: Int { authorizationRequests.withLock { $0 } }
+
     func present(title: String, body: String) { storage.withLock { $0.append(body) } }
+    func requestAuthorization() { authorizationRequests.withLock { $0 += 1 } }
 }
 
 private func finding(identity: String, age: TimeInterval) -> Finding {

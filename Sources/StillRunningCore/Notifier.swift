@@ -2,12 +2,20 @@ import Foundation
 import UserNotifications
 import Detectors
 
+/// Everything that touches UNUserNotificationCenter goes through here.
+/// `UNUserNotificationCenter.current()` aborts outright in a process without an
+/// app bundle, so tests must never reach the real one.
 public protocol NotificationPresenting: Sendable {
     func present(title: String, body: String)
+    func requestAuthorization()
 }
 
 public struct SystemNotificationPresenter: NotificationPresenting {
     public init() {}
+
+    public func requestAuthorization() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
 
     public func present(title: String, body: String) {
         let content = UNMutableNotificationContent()
@@ -42,8 +50,13 @@ public struct Notifier: Sendable {
         }
     }
 
+    public func requestAuthorization() {
+        presenter.requestAuthorization()
+    }
+
+    /// For callers that only have the type, such as the settings window.
     public static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        SystemNotificationPresenter().requestAuthorization()
     }
 
     /// What macOS currently allows, in words the settings window can show.

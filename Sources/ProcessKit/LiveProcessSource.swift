@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 public protocol SnapshotSource: Sendable {
     func sample() async -> Snapshot
@@ -7,11 +8,67 @@ public protocol SnapshotSource: Sendable {
 
 /// Reads the machine's process table. Everything here works for the current
 /// user's processes without elevated privileges.
-public struct LiveProcessSource: Sendable {
+///
+/// Reading one process's arguments means a sysctl into a buffer the size of
+/// ARGMAX, which is a megabyte. Doing that for eight hundred processes every
+/// few seconds costs more than everything this app is trying to save, so
+/// arguments are cached: they cannot change while a process lives, and a pid
+/// paired with its start time identifies a process uniquely.
+public final class LiveProcessSource: Sendable {
+    private struct Cached {
+        let startedAt: Date
+        let arguments: [String]
+    }
+
+    private let cache = Mutex<[Int32: Cached]>([:])
+
     public init() {}
 
     public func processes() -> [ProcessSample] {
-        kinfoProcs().compactMap { sample(from: $0) }
+        let entries = kinfoProcs()
+        // One scratch buffer for the whole sweep. ARGMAX is a megabyte, and
+        // allocating that per process is what made sampling expensive.
+        let scratch = UnsafeMutablePointer<CChar>.allocate(capacity: Self.argumentMax)
+        defer { scratch.deallocate() }
+
+        let known = cache.withLock { $0 }
+        var fresh: [Int32: Cached] = [:]
+        fresh.reserveCapacity(entries.count)
+
+        let samples = entries.compactMap { kp -> ProcessSample? in
+            guard let started = Self.startTime(kp) else { return nil }
+            let pid = kp.kp_proc.p_pid
+
+            let arguments: [String]
+            if let hit = known[pid], hit.startedAt == started {
+                arguments = hit.arguments
+            } else {
+                arguments = readArguments(pid, into: scratch)
+            }
+            fresh[pid] = Cached(startedAt: started, arguments: arguments)
+
+            return sample(from: kp, startedAt: started, arguments: arguments)
+        }
+
+        // Dropping everything not seen this time also evicts dead pids.
+        cache.withLock { $0 = fresh }
+        return samples
+    }
+
+    /// ARGMAX, read once. It does not change while the machine is up.
+    private static let argumentMax: Int = {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        var mib: [Int32] = [CTL_KERN, KERN_ARGMAX]
+        guard sysctl(&mib, 2, &value, &size, nil, 0) == 0, value > 0 else { return 1 << 20 }
+        return Int(value)
+    }()
+
+    private static func startTime(_ kp: kinfo_proc) -> Date? {
+        guard kp.kp_proc.p_pid > 0 else { return nil }
+        return Date(timeIntervalSince1970:
+            Double(kp.kp_proc.p_starttime.tv_sec) +
+            Double(kp.kp_proc.p_starttime.tv_usec) / 1_000_000)
     }
 
     private func kinfoProcs() -> [kinfo_proc] {
@@ -24,24 +81,20 @@ public struct LiveProcessSource: Sendable {
         return Array(procs.prefix(size / stride))
     }
 
-    private func sample(from kp: kinfo_proc) -> ProcessSample? {
+    private func sample(from kp: kinfo_proc, startedAt started: Date,
+                        arguments: [String]) -> ProcessSample? {
         let pid = kp.kp_proc.p_pid
-        guard pid > 0 else { return nil }
 
         var info = proc_taskinfo()
         let infoSize = Int32(MemoryLayout<proc_taskinfo>.size)
         let gotInfo = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, infoSize) == infoSize
-
-        let started = Date(timeIntervalSince1970:
-            Double(kp.kp_proc.p_starttime.tv_sec) +
-            Double(kp.kp_proc.p_starttime.tv_usec) / 1_000_000)
 
         return ProcessSample(
             pid: pid,
             ppid: kp.kp_eproc.e_ppid,
             uid: kp.kp_eproc.e_ucred.cr_uid,
             executablePath: executablePath(pid),
-            arguments: arguments(pid),
+            arguments: arguments,
             startedAt: started,
             hasControllingTTY: kp.kp_eproc.e_tdev != -1,
             cpuTimeNanos: gotInfo ? info.pti_total_user + info.pti_total_system : 0,
@@ -55,40 +108,45 @@ public struct LiveProcessSource: Sendable {
         return String(cString: buffer)
     }
 
-    /// Reads argv via KERN_PROCARGS2. Returns [] for processes we may not inspect.
-    private func arguments(_ pid: Int32) -> [String] {
-        var argmax: Int32 = 0
-        var argmaxSize = MemoryLayout<Int32>.size
-        var argmaxMIB: [Int32] = [CTL_KERN, KERN_ARGMAX]
-        guard sysctl(&argmaxMIB, 2, &argmax, &argmaxSize, nil, 0) == 0, argmax > 0 else { return [] }
-
-        var buffer = [CChar](repeating: 0, count: Int(argmax))
-        var bufferSize = Int(argmax)
+    /// Reads argv via KERN_PROCARGS2 into a caller-owned buffer, so one
+    /// allocation serves the whole sweep. Returns [] for processes we may not
+    /// inspect.
+    private func readArguments(_ pid: Int32, into scratch: UnsafeMutablePointer<CChar>) -> [String] {
+        var written = Self.argumentMax
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
-        guard sysctl(&mib, 3, &buffer, &bufferSize, nil, 0) == 0,
-              bufferSize > MemoryLayout<Int32>.size else { return [] }
+        guard sysctl(&mib, 3, scratch, &written, nil, 0) == 0,
+              written > MemoryLayout<Int32>.size else { return [] }
 
         var argc: Int32 = 0
-        memcpy(&argc, buffer, MemoryLayout<Int32>.size)
+        memcpy(&argc, scratch, MemoryLayout<Int32>.size)
         guard argc > 0 else { return [] }
 
+        // Everything below stays inside what sysctl actually wrote. The buffer
+        // is reused across processes, so bytes past that point are another
+        // process's leftovers rather than a terminator.
+        let limit = min(written, Self.argumentMax)
+
+        func string(at start: Int) -> (value: String, next: Int)? {
+            guard start < limit else { return nil }
+            var end = start
+            while end < limit, scratch[end] != 0 { end += 1 }
+            let raw = UnsafeRawBufferPointer(start: UnsafeRawPointer(scratch + start), count: end - start)
+            return (String(decoding: raw, as: UTF8.self), end + 1)
+        }
+
+        guard let path = string(at: MemoryLayout<Int32>.size) else { return [] }
+        var index = path.next
+        while index < limit, scratch[index] == 0 { index += 1 }   // padding after the exec path
+
         var result: [String] = []
-        buffer.withUnsafeBufferPointer { pointer in
-            guard let base = pointer.baseAddress else { return }
-            let end = base + bufferSize
-            var cursor = base + MemoryLayout<Int32>.size
-            while cursor < end, cursor.pointee != 0 { cursor += 1 }   // skip exec path
-            while cursor < end, cursor.pointee == 0 { cursor += 1 }   // skip padding
-            var read: Int32 = 0
-            while cursor < end, read < argc {
-                let argument = String(cString: cursor)
-                // Tools that rewrite their own process title (npm, and anything
-                // using setproctitle) leave empty slots behind. They are never
-                // meaningful and they confuse anything reading argv positionally.
-                if !argument.isEmpty { result.append(argument) }
-                cursor += argument.utf8.count + 1
-                read += 1
-            }
+        var read: Int32 = 0
+        while read < argc, let argument = string(at: index) {
+            // Tools that rewrite their own process title (npm, and anything
+            // using setproctitle) leave empty slots behind. They are never
+            // meaningful and they confuse anything reading argv positionally.
+            if !argument.value.isEmpty { result.append(argument.value) }
+            index = argument.next
+            read += 1
         }
         return result
     }

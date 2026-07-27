@@ -101,6 +101,14 @@ struct PanelView: View {
                         Text("\(group.findings.count)")
                             .font(.eyebrow)
                             .foregroundStyle(.tertiary)
+                        Spacer(minLength: 0)
+                        // Says once what the bars under each row mean, rather
+                        // than leaving them to be guessed at.
+                        if store.findings.count > 1, group.section == grouped.first?.section {
+                            Text("longest running first")
+                                .font(.eyebrow)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 14)

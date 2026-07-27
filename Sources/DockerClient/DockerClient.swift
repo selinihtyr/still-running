@@ -29,8 +29,30 @@ public struct DockerContainer: Sendable, Equatable, Codable {
     }
 }
 
+/// Start times keyed by container id. A running container's start time does
+/// not change, so inspecting it once per container is enough — otherwise every
+/// sample costs one extra round trip per container, forever.
+private final class StartTimeCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String: Date] = [:]
+
+    func value(for id: String) -> Date? {
+        lock.lock(); defer { lock.unlock() }
+        return entries[id]
+    }
+
+    func store(_ date: Date, for id: String) {
+        lock.lock(); entries[id] = date; lock.unlock()
+    }
+
+    func keepOnly(_ ids: Set<String>) {
+        lock.lock(); entries = entries.filter { ids.contains($0.key) }; lock.unlock()
+    }
+}
+
 public struct DockerClient: Sendable {
     private let http: UnixSocketHTTP
+    private let startTimes = StartTimeCache()
     private static let apiVersion = "v1.43"
 
     public init(socketPath: String) { self.http = UnixSocketHTTP(socketPath: socketPath) }
@@ -56,10 +78,17 @@ public struct DockerClient: Sendable {
         }
         let listed = try Self.decodeContainers(response.body)
 
+        startTimes.keepOnly(Set(listed.map(\.id)))
+
         var result: [DockerContainer] = []
         result.reserveCapacity(listed.count)
         for container in listed {
+            if let known = startTimes.value(for: container.id) {
+                result.append(container.startedAt(known))
+                continue
+            }
             let started = (try? await startedAt(id: container.id)) ?? container.created
+            startTimes.store(started, for: container.id)
             result.append(container.startedAt(started))
         }
         return result

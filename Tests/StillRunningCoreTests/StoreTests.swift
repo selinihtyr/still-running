@@ -339,6 +339,41 @@ private func manyContainerSnapshots() -> [Snapshot] {
 }
 
 @MainActor
+@Test func theFirstLaunchTurnsRemindersOnAndAsksForPermission() {
+    let defaults = cleanDefaults("store-20")
+    let presenter = RecordingPresenter()
+    let store = Store(source: ScriptedSource(snapshots: automationSnapshots()),
+                      stopper: SpyStopper(), defaults: defaults,
+                      notifier: Notifier(presenter: presenter))
+    #expect(store.settings.notifyAfter == nil)
+
+    store.prepareFirstRun()
+
+    #expect(store.settings.notifyAfter == 28_800.0)
+    #expect(SettingsStore(defaults: defaults).settings.notifyAfter == 28_800.0)
+    #expect(presenter.timesAsked == 1)
+}
+
+@MainActor
+@Test func laterLaunchesLeaveTheUsersChoiceAloneAndDoNotAskAgain() {
+    let defaults = cleanDefaults("store-21")
+    let presenter = RecordingPresenter()
+    let first = Store(source: ScriptedSource(snapshots: automationSnapshots()),
+                      stopper: SpyStopper(), defaults: defaults,
+                      notifier: Notifier(presenter: presenter))
+    first.prepareFirstRun()
+    first.settings.notifyAfter = nil     // the user turns reminders back off
+
+    let second = Store(source: ScriptedSource(snapshots: automationSnapshots()),
+                       stopper: SpyStopper(), defaults: defaults,
+                       notifier: Notifier(presenter: presenter))
+    second.prepareFirstRun()
+
+    #expect(second.settings.notifyAfter == nil)
+    #expect(presenter.timesAsked == 1)
+}
+
+@MainActor
 @Test func cadenceIsFiveSecondsOpenAndSixtyClosed() {
     let store = makeStore("store-8")
 
