@@ -20,13 +20,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/menubar-hot.png" width="150" alt="The menu bar icon glowing amber next to 99%">
-</p>
-
-<p align="center">
-  <sub>The icon carries the size of the waste, not just the count: quiet and
-  monochrome while nothing burns, warming through amber into red as forgotten
-  things eat cores.</sub>
+  <sub>The icon stays monochrome, the way menu bar icons do. It carries the
+  size of the waste rather than only its count: a quiet ring when nothing is
+  left over, a dotted ring once something is, a flame once it is eating a core
+  — and the number beside it becomes a percentage when that is the more useful
+  figure.</sub>
 </p>
 
 ## Why
