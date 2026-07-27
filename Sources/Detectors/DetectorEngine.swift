@@ -34,12 +34,15 @@ public struct DetectorEngine: Sendable {
     private let detectors: [any Detector]
     private let hotThreshold: Double
     private let hotLimit: Int
+    private let hotWindow: TimeInterval
 
     public init(detectors: [any Detector] = DetectorEngine.defaultDetectors,
-                hotThreshold: Double = 20, hotLimit: Int = 5) {
+                hotThreshold: Double = 20, hotLimit: Int = 5,
+                hotWindow: TimeInterval = 30) {
         self.detectors = detectors
         self.hotThreshold = hotThreshold
         self.hotLimit = hotLimit
+        self.hotWindow = hotWindow
     }
 
     /// Order matters: the first detector to claim a pid owns it.
@@ -69,17 +72,39 @@ public struct DetectorEngine: Sendable {
         }
 
         let hot = snapshot.processes
-            // Never report itself: whatever this app costs is the app's own
-            // problem to fix, not the user's to act on.
-            .filter { !claimed.contains($0.pid) && $0.pid != snapshot.ownPID }
+            .filter { Self.canBeBusyButYours($0, in: snapshot, claimed: claimed) }
             .compactMap { process -> HotProcess? in
-                guard let cpu = history.cpuPercent(pid: process.pid), cpu >= hotThreshold else { return nil }
+                // Sustained, not a spike. Anything that flares for one interval
+                // and settles would otherwise appear and vanish for no reason
+                // the user can see.
+                guard let cpu = history.sustainedCPU(pid: process.pid, over: hotWindow),
+                      cpu >= hotThreshold else { return nil }
                 return HotProcess(pid: process.pid, name: process.name, cpuPercent: cpu)
             }
             .sorted { $0.cpuPercent > $1.cpuPercent }
             .prefix(hotLimit)
 
         return EngineResult(findings: findings, alsoHot: Array(hot))
+    }
+
+    /// "Busy, but yours" means exactly that: something of the user's own that
+    /// has been busy for a while. Not a system daemon they cannot act on, and
+    /// not a piece of a simulator that is already listed as one row.
+    static func canBeBusyButYours(_ process: ProcessSample, in snapshot: Snapshot,
+                                  claimed: Set<Int32>) -> Bool {
+        guard !claimed.contains(process.pid),
+              process.pid != snapshot.ownPID,          // its own cost is its own problem
+              process.uid == snapshot.currentUID,
+              !isSimulatorInternal(process)
+        else { return false }
+        return true
+    }
+
+    /// Everything a booted device runs lives under its own data directory.
+    static func isSimulatorInternal(_ process: ProcessSample) -> Bool {
+        process.name == "launchd_sim"
+            || process.executablePath.contains("/CoreSimulator/")
+            || process.arguments.contains { $0.contains("/CoreSimulator/Devices/") }
     }
 
     /// Convenience for callers with default settings and no exclusions.
