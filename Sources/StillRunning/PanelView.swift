@@ -258,15 +258,16 @@ struct PanelView: View {
                 }
             }
             Spacer(minLength: 0)
+            // Fixed frames, and no spinning: a sample takes about a tenth of a
+            // second, so an animation only ever got interrupted — leaving the
+            // glyph at a random angle and nudging its neighbours as its bounding
+            // box changed. The footer text already says "Checking…".
             Button {
                 Task { await store.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
-                    .animation(store.isRefreshing
-                               ? .linear(duration: 0.7).repeatForever(autoreverses: false)
-                               : .default,
-                               value: store.isRefreshing)
+                    .frame(width: 16, height: 16)
+                    .opacity(store.isRefreshing ? 0.4 : 1)
             }
             .disabled(store.isRefreshing)
             .help("Check again")
@@ -275,12 +276,14 @@ struct PanelView: View {
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
                 Image(systemName: "gearshape")
+                    .frame(width: 16, height: 16)
             }
             .help("Settings")
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Image(systemName: "power")
+                    .frame(width: 16, height: 16)
             }
             .help("Quit Still Running")
         }
