@@ -82,6 +82,15 @@ public final class Store {
     /// Five seconds while the user is looking, a minute while they are not.
     public var currentInterval: TimeInterval { panelOpen ? 5 : 60 }
 
+    /// How much CPU the forgotten things are eating between them. 100 is a
+    /// whole core.
+    public var wastedCPUPercent: Double {
+        findings.reduce(0) { $0 + $1.cpuPercent }
+    }
+
+    /// How hard the machine is being pushed right now, refreshed with each sample.
+    public private(set) var thermal: Thermal = .current
+
     public init(source: any SnapshotSource = LiveSnapshotSource(),
                 stopper: any Stopping = StopCoordinator(),
                 restarter: any Restarting = RestartCoordinator(),
@@ -132,6 +141,7 @@ public final class Store {
         let snapshot = await source.sample()
         latest = snapshot
         lastSampledAt = snapshot.takenAt
+        thermal = .current
         history.record(snapshot)
 
         let result = engine.evaluate(snapshot: snapshot, history: history,
@@ -204,6 +214,13 @@ public final class Store {
         inFlight.insert(finding.identity)
         defer { inFlight.remove(finding.identity) }
 
+        // The row goes as soon as the stop is under way. Docker can spend ten
+        // seconds waiting out a container's grace period, and leaving the row
+        // sitting there for that long makes a click feel like it missed.
+        // Anything that turns out to still be running comes back on the next
+        // sample.
+        findings.removeAll { $0.identity == finding.identity }
+
         switch await stopper.stop(finding, in: snapshot) {
         case .stopped:
             forceableIdentities.remove(finding.identity)
@@ -248,7 +265,15 @@ public final class Store {
     }
 
     public func setPanelOpen(_ open: Bool) {
+        let changed = panelOpen != open
         panelOpen = open
+        guard changed, open, samplingTask != nil else { return }
+
+        // Opening must show something current. Otherwise the panel waits out
+        // whatever remains of the minute-long sleep it started while closed,
+        // and until a second sample lands there are no rates to show at all.
+        stopSampling()
+        startSampling()
     }
 
     public func startSampling() {

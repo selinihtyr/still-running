@@ -13,6 +13,8 @@ private final class ScriptedSource: SnapshotSource {
 
     init(snapshots: [Snapshot]) { self.snapshots = snapshots }
 
+    var samplesTaken: Int { cursor.withLock { $0 } }
+
     func sample() async -> Snapshot {
         cursor.withLock { index in
             let snapshot = snapshots[min(index, snapshots.count - 1)]
@@ -371,6 +373,50 @@ private func manyContainerSnapshots() -> [Snapshot] {
 
     #expect(second.settings.notifyAfter == nil)
     #expect(presenter.timesAsked == 1)
+}
+
+@MainActor
+@Test func theRowLeavesTheListAsSoonAsTheStopIsUnderWay() async {
+    // Docker can spend ten seconds on a container's grace period; the click
+    // must not look like it missed for that long.
+    let store = makeContainerStore("store-23", stopper: SpyStopper(delay: .milliseconds(300)))
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+    let before = store.findings.count
+
+    let task = Task { await store.stop(finding) }
+    try? await Task.sleep(for: .milliseconds(80))
+    #expect(store.findings.count == before - 1)
+    #expect(!store.findings.contains { $0.identity == finding.identity })
+
+    await task.value
+}
+
+@MainActor
+@Test func somethingThatSurvivedTheStopComesBackOnTheNextSample() async {
+    let store = makeContainerStore("store-24", stopper: SpyStopper(outcome: .stillRunning))
+    await store.refresh(); await store.refresh()
+    let finding = store.findings[0]
+
+    await store.stop(finding)
+
+    #expect(store.findings.contains { $0.identity == finding.identity })
+    #expect(store.forceableIdentities.contains(finding.identity))
+}
+
+@MainActor
+@Test func openingThePanelSamplesStraightAwayRatherThanWaitingOutTheSlowCadence() async {
+    let source = ScriptedSource(snapshots: automationSnapshots())
+    let store = Store(source: source, stopper: SpyStopper(), defaults: cleanDefaults("store-22"))
+    store.startSampling()
+    try? await Task.sleep(for: .milliseconds(150))
+    let beforeOpening = source.samplesTaken
+
+    store.setPanelOpen(true)
+    try? await Task.sleep(for: .milliseconds(150))
+
+    #expect(source.samplesTaken > beforeOpening)
+    store.stopSampling()
 }
 
 @MainActor

@@ -92,10 +92,14 @@ private var eager: Settings {
 
 @Test func liveGuardRefusesTheUsersOwnBrowser() async {
     let snapshot = await liveSnapshot()
+    // The root browser process, not a helper: Chrome retires renderers on its
+    // own schedule, and a helper can be gone before the assertion runs.
     let ownBrowser = snapshot.processes.first {
         IsolatedBrowserDetector.isBrowser($0)
             && IsolatedBrowserDetector.isolationSignature($0) == nil
             && $0.uid == snapshot.currentUID
+            && !$0.executablePath.contains("Helper")
+            && $0.executablePath.hasSuffix("/MacOS/\($0.name)")
     }
     guard let ownBrowser else { return }   // no browser running: nothing to prove
 

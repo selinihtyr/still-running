@@ -10,9 +10,14 @@ struct StillRunningApp: App {
             PanelView(store: store)
         } label: {
             // A clean machine gets a quiet menu bar: icon only, no number.
-            Image(systemName: store.findings.isEmpty ? "circle" : "circle.dotted.circle")
+            Image(nsImage: MenuBarIcon.image(wastedCPU: store.wastedCPUPercent,
+                                             findingCount: store.findings.count))
             if !store.findings.isEmpty {
-                Text("\(store.findings.count)")
+                // Once something is genuinely burning, the size of the waste
+                // says more than how many things there are.
+                Text(store.wastedCPUPercent >= 20
+                     ? "\(Int(store.wastedCPUPercent))%"
+                     : "\(store.findings.count)")
             }
             // Sampling belongs here rather than on the panel: the label is the
             // only view that always exists, so the badge is right before the

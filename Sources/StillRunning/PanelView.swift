@@ -43,7 +43,7 @@ struct PanelView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(headline)
                     .font(.system(size: 15, weight: .semibold))
@@ -52,10 +52,37 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            thermalBadge
         }
         .padding(.horizontal, 14)
         .padding(.top, 13)
         .padding(.bottom, 11)
+    }
+
+    /// macOS reports how hard it is being pushed rather than a temperature in
+    /// degrees; this is the reading it acts on when it spins the fans.
+    @ViewBuilder private var thermalBadge: some View {
+        if store.thermal.isWorthShowing {
+            HStack(spacing: 4) {
+                Image(systemName: store.thermal.symbol)
+                Text(store.thermal.label)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(thermalColor)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(thermalColor.opacity(0.14), in: Capsule())
+            .help("How hard macOS says the machine is being pushed right now.")
+        }
+    }
+
+    private var thermalColor: Color {
+        switch store.thermal {
+        case .nominal: .secondary
+        case .fair: .yellow
+        case .serious: .orange
+        case .critical: .red
+        }
     }
 
     private var headline: String {

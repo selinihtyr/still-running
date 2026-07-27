@@ -32,6 +32,20 @@ public struct StopCoordinator: Sendable {
         await perform(finding, in: snapshot, signal: SIGKILL)
     }
 
+    /// Waits only as long as it takes. Most things exit on the first signal
+    /// within a few hundred milliseconds; sleeping out the whole grace period
+    /// regardless just makes the panel look slow.
+    private func waitForExit(of pids: [Int32]) async -> Bool {
+        guard gracePeriod > 0 else { return !pids.contains(where: { signaller.isAlive($0) }) }
+
+        let deadline = Date().addingTimeInterval(gracePeriod)
+        while Date() < deadline {
+            if !pids.contains(where: { signaller.isAlive($0) }) { return true }
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        return !pids.contains(where: { signaller.isAlive($0) })
+    }
+
     private func perform(_ finding: Finding, in snapshot: Snapshot, signal: Int32) async -> StopOutcome {
         do {
             try guardian.vet(finding, in: snapshot)
@@ -45,8 +59,7 @@ public struct StopCoordinator: Sendable {
             switch finding.target {
             case .processes(let pids):
                 for pid in pids { try signaller.send(signal, to: pid) }
-                if gracePeriod > 0 { try? await Task.sleep(for: .seconds(gracePeriod)) }
-                return pids.contains(where: { signaller.isAlive($0) }) ? .stillRunning : .stopped
+                return await waitForExit(of: pids) ? .stopped : .stillRunning
             case .container(let id):
                 try await containers.stop(id: id)
                 return .stopped
