@@ -12,17 +12,21 @@ import Foundation
     #expect(Formatting.duration(18 * 3600 + 43 * 60) == "18h 43m")
 }
 
-@Test func keepsCountingInHoursPastTheFirstDay() {
+@Test func keepsMinutesVisibleOnTheFirstDay() {
     // A stack of containers started together would otherwise all read "1d 0h"
     // and look frozen.
-    #expect(Formatting.duration(24 * 3600 + 3 * 60) == "24h 3m")
-    #expect(Formatting.duration(24 * 3600 + 7 * 60) == "24h 7m")
-    #expect(Formatting.duration(47 * 3600) == "47h 0m")
+    #expect(Formatting.duration(24 * 3600 + 46 * 60) == "1d 46m")
+    #expect(Formatting.duration(24 * 3600 + 3 * 60) == "1d 3m")
 }
 
-@Test func switchesToDaysOnceMinutesStopMattering() {
-    #expect(Formatting.duration(48 * 3600) == "2d 0h")
+@Test func prefersHoursOverMinutesOnceThereAreAny() {
+    #expect(Formatting.duration(29 * 3600 + 5 * 60) == "1d 5h")
     #expect(Formatting.duration(76 * 3600) == "3d 4h")
+}
+
+@Test func dropsAZeroSecondUnitEntirely() {
+    #expect(Formatting.duration(48 * 3600) == "2d")
+    #expect(Formatting.duration(24 * 3600) == "1d")
 }
 
 @Test func neverShowsANegativeDuration() {
