@@ -69,7 +69,9 @@ public struct DetectorEngine: Sendable {
         }
 
         let hot = snapshot.processes
-            .filter { !claimed.contains($0.pid) }
+            // Never report itself: whatever this app costs is the app's own
+            // problem to fix, not the user's to act on.
+            .filter { !claimed.contains($0.pid) && $0.pid != snapshot.ownPID }
             .compactMap { process -> HotProcess? in
                 guard let cpu = history.cpuPercent(pid: process.pid), cpu >= hotThreshold else { return nil }
                 return HotProcess(pid: process.pid, name: process.name, cpuPercent: cpu)

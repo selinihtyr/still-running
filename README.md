@@ -19,6 +19,16 @@
   <sub>Lives in the menu bar. No Dock icon, no window, no account, no login item.</sub>
 </p>
 
+<p align="center">
+  <img src="docs/images/menubar-hot.png" width="150" alt="The menu bar icon glowing amber next to 99%">
+</p>
+
+<p align="center">
+  <sub>The icon carries the size of the waste, not just the count: quiet and
+  monochrome while nothing burns, warming through amber into red as forgotten
+  things eat cores.</sub>
+</p>
+
 ## Why
 
 A laptop got hot. The cause turned out to be a headless Chrome, started by a
@@ -45,7 +55,9 @@ or orphaned, or above 25% CPU sustained for three minutes, or idle for half an
 hour while holding more than 500 MB. All of them are adjustable.
 
 Rates come from a rolling five-minute history rather than a single reading, so
-a brief spike never puts anything on the list.
+a brief spike never puts anything on the list. The header reports how hard
+macOS says the machine is being pushed — the reading it acts on when it spins
+the fans — and says nothing at all while the machine is comfortable.
 
 A dev server is usually several processes — `npm run dev` launches a framework,
 which launches a bundler — so it is reported and stopped as the tree it is,
@@ -86,11 +98,8 @@ Anything you always keep running can be dismissed for good from the row's
 
 ## Settings
 
-<p align="center">
-  <img src="docs/images/settings.png" width="420" alt="Settings: how long before something counts as forgotten, when to be reminded, and a button that sends a test notification">
-</p>
-
-Reminders are one quiet notification when something has been running far past
+Two things to set: how long something must run before it counts as forgotten,
+and when to be reminded. Reminders are one quiet notification when something has been running far past
 your threshold, at most once per thing. The test button asks macOS for
 permission and reports back exactly what it allows, including whether sound is
 switched off for the app — which macOS keeps as a separate switch.

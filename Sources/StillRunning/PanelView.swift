@@ -8,8 +8,6 @@ struct PanelView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var confirmingStopAll = false
 
-    private var longestAge: TimeInterval { store.findings.map(\.age).max() ?? 0 }
-
     private var grouped: [(section: String, findings: [Finding])] {
         Dictionary(grouping: store.findings) { Theme.section(for: $0.kind) }
             .sorted { a, b in
@@ -128,14 +126,6 @@ struct PanelView: View {
                         Text("\(group.findings.count)")
                             .font(.eyebrow)
                             .foregroundStyle(.tertiary)
-                        Spacer(minLength: 0)
-                        // Says once what the bars under each row mean, rather
-                        // than leaving them to be guessed at.
-                        if store.findings.count > 1, group.section == grouped.first?.section {
-                            Text("longest running first")
-                                .font(.eyebrow)
-                                .foregroundStyle(.tertiary)
-                        }
                     }
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 14)
@@ -143,7 +133,7 @@ struct PanelView: View {
 
                     VStack(spacing: 0) {
                         ForEach(group.findings) { finding in
-                            FindingRow(finding: finding, longestAge: longestAge, store: store)
+                            FindingRow(finding: finding, store: store)
                             if finding.identity != group.findings.last?.identity {
                                 Divider().padding(.leading, 46)
                             }

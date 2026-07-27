@@ -81,6 +81,17 @@ import ProcessKit
     #expect(result.alsoHot.isEmpty)
 }
 
+@Test func neverReportsItselfAsBusy() {
+    let itself = Fixtures.process(pid: 999, path: "/Applications/Still Running.app/Contents/MacOS/StillRunning",
+                                  args: ["StillRunning"], ageHours: 1, rssMB: 60)
+    let processes = [itself] + Fixtures.system()
+    let result = DetectorEngine().evaluate(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 60))
+
+    #expect(!result.alsoHot.contains { $0.pid == 999 })
+}
+
 @Test func aQuietMachineProducesNothing() {
     let processes = Fixtures.system()
     let result = DetectorEngine().evaluate(

@@ -4,9 +4,6 @@ import StillRunningCore
 
 struct FindingRow: View {
     let finding: Finding
-    /// The age of the oldest thing on the list, so every rail is drawn to the
-    /// same scale and the longest-lived row reads as full width.
-    let longestAge: TimeInterval
     @Bindable var store: Store
 
     @State private var hovering = false
@@ -15,21 +12,16 @@ struct FindingRow: View {
     private var accent: Color { Theme.accent(for: finding) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                icon
-                titles
-                Spacer(minLength: 8)
-                figures
-                action
-                more
-            }
-            // With a single finding there is nothing to compare against, and a
-            // lone bar reads as a progress bar rather than a scale.
-            if showsRail { durationRail }
+        HStack(alignment: .top, spacing: 8) {
+            icon
+            titles
+            Spacer(minLength: 8)
+            figures
+            action
+            more
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.vertical, 10)
         .background(hovering ? Color.primary.opacity(0.06) : .clear)
         .contentShape(.rect)
         .onHover { hovering = $0 }
@@ -143,32 +135,6 @@ struct FindingRow: View {
         .opacity(hovering ? 1 : 0.4)
         .disabled(store.isStopping(finding))
         .help("More for \(finding.title)")
-    }
-
-    private var showsRail: Bool { store.findings.count > 1 && longestAge > 0 }
-
-    private var railExplanation: String {
-        "Running \(Formatting.duration(finding.age)). The bar compares that with the longest on this list, \(Formatting.duration(longestAge))."
-    }
-
-    /// The signature of the panel: how long this has been alive, drawn against
-    /// the oldest thing on the list. The list becomes a picture of who has been
-    /// here longest, which is the decision being made.
-    private var durationRail: some View {
-        GeometryReader { proxy in
-            let fraction = longestAge > 0 ? min(1, finding.age / longestAge) : 0
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.07))
-                Capsule()
-                    .fill(LinearGradient(colors: [accent.opacity(0.35), accent.opacity(0.85)],
-                                         startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(3, proxy.size.width * fraction))
-            }
-        }
-        .frame(height: 3)
-        .padding(.leading, 34)
-        .animation(.smooth(duration: 0.4), value: finding.age)
-        .help(railExplanation)
     }
 
     private var stopVerb: String {
