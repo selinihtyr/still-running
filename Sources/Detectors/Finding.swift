@@ -57,14 +57,17 @@ public struct Finding: Sendable, Identifiable, Equatable {
 }
 
 public enum Formatting {
-    /// "18h 43m", "45m", "2d 3h"
+    /// "45m", "18h 43m", "24h 3m", "3d 4h".
+    ///
+    /// Hours run past a day rather than rolling over at 24, because a stack of
+    /// containers started together would otherwise all read "1d 0h" and look
+    /// frozen. Days only take over once the minutes stop mattering.
     public static func duration(_ interval: TimeInterval) -> String {
         let total = max(0, Int(interval))
-        let days = total / 86_400
-        let hours = (total % 86_400) / 3600
+        let hours = total / 3600
         let minutes = (total % 3600) / 60
-        if days > 0 { return "\(days)d \(hours)h" }
-        if hours > 0 { return "\(hours)h \(minutes)m" }
+        if hours >= 48 { return "\(hours / 24)d \(hours % 24)h" }
+        if hours >= 1 { return "\(hours)h \(minutes)m" }
         return "\(minutes)m"
     }
 

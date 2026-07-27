@@ -40,6 +40,56 @@ public struct Notifier: Sendable {
     }
 
     public static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// What macOS currently allows, in words the settings window can show.
+    public enum Permission: Sendable, Equatable {
+        case allowed
+        case notAskedYet
+        case blocked
+        case unavailable(String)
+
+        public var message: String {
+            switch self {
+            case .allowed: "Notifications are allowed."
+            case .notAskedYet: "macOS has not been asked yet. Send a test to ask."
+            case .blocked: "macOS is blocking notifications for Still Running. Turn them on in System Settings › Notifications."
+            case .unavailable(let why): "Notifications are unavailable: \(why)"
+            }
+        }
+    }
+
+    public static func permission() async -> Permission {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return .allowed
+        case .notDetermined: return .notAskedYet
+        case .denied: return .blocked
+        @unknown default: return .unavailable("unknown status")
+        }
+    }
+
+    /// Asks for permission if needed, then sends one notification so the user
+    /// can see for themselves whether it arrives.
+    public static func sendTest() async -> Permission {
+        let center = UNUserNotificationCenter.current()
+        if await permission() == .notAskedYet {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        }
+        let current = await permission()
+        guard current == .allowed else { return current }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Still Running"
+        content.body = "This is what a reminder looks like."
+        content.sound = .default
+        do {
+            try await center.add(UNNotificationRequest(identifier: UUID().uuidString,
+                                                       content: content, trigger: nil))
+            return .allowed
+        } catch {
+            return .unavailable("\(error.localizedDescription)")
+        }
     }
 }

@@ -11,9 +11,12 @@ struct SettingsView: View {
         ("1 hour", 3600), ("2 hours", 7200), ("4 hours", 14_400), ("8 hours", 28_800),
     ]
     private let notifyChoices: [(label: String, value: TimeInterval?)] = [
-        ("Never", nil), ("After 4 hours", 14_400), ("After 8 hours", 28_800),
-        ("After a day", 86_400),
+        ("Never", nil), ("After 15 minutes", 900), ("After 1 hour", 3600),
+        ("After 4 hours", 14_400), ("After 8 hours", 28_800), ("After a day", 86_400),
     ]
+
+    @State private var permission: Notifier.Permission?
+    @State private var testing = false
 
     var body: some View {
         Form {
@@ -27,6 +30,28 @@ struct SettingsView: View {
             }
             Picker("Notify me", selection: notifyBinding) {
                 ForEach(notifyChoices, id: \.label) { Text($0.label).tag($0.value) }
+            }
+
+            Section {
+                HStack {
+                    Button(testing ? "Sending…" : "Send a test notification") {
+                        testing = true
+                        Task {
+                            permission = await Notifier.sendTest()
+                            testing = false
+                        }
+                    }
+                    .disabled(testing)
+                    Spacer()
+                }
+                if let permission {
+                    Text(permission == .allowed
+                         ? "Sent. If nothing appeared, check Notification Centre."
+                         : permission.message)
+                        .font(.system(size: 11))
+                        .foregroundStyle(permission == .allowed ? Color.secondary : Color.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Text("Still Running never deletes anything. Every action stops a process, container, or simulator that you can start again.")
                 .font(.caption)

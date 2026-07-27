@@ -47,6 +47,8 @@ public final class Store {
     public private(set) var lastError: String?
     /// When the machine was last looked at, for the panel's footer.
     public private(set) var lastSampledAt: Date?
+    /// True while a sample is being taken, so the panel can show it happening.
+    public private(set) var isRefreshing = false
 
     public var settings: Settings {
         didSet { settingsStore.settings = settings }
@@ -107,6 +109,8 @@ public final class Store {
     }
 
     public func refresh() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
         let snapshot = await source.sample()
         latest = snapshot
         lastSampledAt = snapshot.takenAt

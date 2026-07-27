@@ -223,16 +223,27 @@ struct PanelView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(2)
             } else {
-                Text(checkedLabel)
-                    .font(.rowDetail)
-                    .foregroundStyle(.tertiary)
+                // A live counter is the cheapest possible proof that the app is
+                // still watching, and that pressing refresh did something.
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(checkedLabel(at: context.date))
+                        .font(.rowDetail)
+                        .foregroundStyle(.tertiary)
+                        .contentTransition(.numericText())
+                }
             }
             Spacer(minLength: 0)
             Button {
                 Task { await store.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .rotationEffect(.degrees(store.isRefreshing ? 360 : 0))
+                    .animation(store.isRefreshing
+                               ? .linear(duration: 0.7).repeatForever(autoreverses: false)
+                               : .default,
+                               value: store.isRefreshing)
             }
+            .disabled(store.isRefreshing)
             .help("Check again")
             Button {
                 openWindow(id: "settings")
@@ -254,9 +265,10 @@ struct PanelView: View {
         .padding(.vertical, 9)
     }
 
-    private var checkedLabel: String {
+    private func checkedLabel(at now: Date) -> String {
+        if store.isRefreshing { return "Checking…" }
         guard let checked = store.lastSampledAt else { return "Checking…" }
-        let seconds = Int(Date().timeIntervalSince(checked))
-        return seconds < 5 ? "Checked just now" : "Checked \(seconds)s ago"
+        let seconds = max(0, Int(now.timeIntervalSince(checked)))
+        return seconds < 1 ? "Checked just now" : "Checked \(seconds)s ago"
     }
 }
