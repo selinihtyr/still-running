@@ -13,18 +13,7 @@ public struct IsolatedBrowserDetector: Detector {
                                          "Brave Browser", "Firefox", "Safari"]
 
     public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
-        let candidates = snapshot.processes.filter {
-            $0.uid == snapshot.currentUID && $0.pid != snapshot.ownPID && Self.isBrowser($0)
-        }
-
-        // Group by profile directory, so a fifteen-process Chrome tree is one row.
-        var groups: [String: [ProcessSample]] = [:]
-        for process in candidates {
-            guard let signature = Self.isolationSignature(process) else { continue }
-            groups[signature, default: []].append(process)
-        }
-
-        return groups.compactMap { signature, group -> Finding? in
+        Self.isolatedGroups(in: snapshot).compactMap { signature, group -> Finding? in
             let sorted = group.sorted { $0.startedAt < $1.startedAt }
             guard let root = sorted.first else { return nil }
 
@@ -53,6 +42,44 @@ public struct IsolatedBrowserDetector: Detector {
 
     public static func isBrowser(_ process: ProcessSample) -> Bool {
         browserMarkers.contains { process.executablePath.contains($0) }
+    }
+
+    /// Profile signature to every process belonging to that profile.
+    ///
+    /// Grouping cannot go by the `--user-data-dir` flag alone: Chrome omits it
+    /// from some helper types, so a flag-only grouping under-reports memory and
+    /// would leave those helpers looking like the user's own browser. The tree
+    /// is the truth — whatever descends from an isolated root is isolated.
+    public static func isolatedGroups(in snapshot: Snapshot) -> [String: [ProcessSample]] {
+        let browsers = snapshot.processes.filter {
+            Self.isBrowser($0) && $0.uid == snapshot.currentUID && $0.pid != snapshot.ownPID
+        }
+        var childrenOf: [Int32: [ProcessSample]] = [:]
+        for process in browsers { childrenOf[process.ppid, default: []].append(process) }
+
+        let seeds = browsers
+            .compactMap { process in isolationSignature(process).map { (process, $0) } }
+            .sorted { $0.0.startedAt < $1.0.startedAt }   // outermost root first
+
+        var groups: [String: [ProcessSample]] = [:]
+        var assigned: Set<Int32> = []
+        for (seed, signature) in seeds {
+            guard !assigned.contains(seed.pid) else { continue }
+            var stack = [seed]
+            while let current = stack.popLast() {
+                guard !assigned.contains(current.pid) else { continue }
+                assigned.insert(current.pid)
+                groups[signature, default: []].append(current)
+                stack.append(contentsOf: childrenOf[current.pid] ?? [])
+            }
+        }
+        return groups
+    }
+
+    /// Every pid that belongs to an isolated profile. The safety guard uses
+    /// this to tell a helper of an automation browser apart from the user's own.
+    public static func isolatedPIDs(in snapshot: Snapshot) -> Set<Int32> {
+        Set(isolatedGroups(in: snapshot).values.flatMap { $0.map(\.pid) })
     }
 
     static func browserName(_ process: ProcessSample) -> String {

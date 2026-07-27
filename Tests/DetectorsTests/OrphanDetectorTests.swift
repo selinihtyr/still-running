@@ -94,6 +94,20 @@ import ProcessKit
     #expect(findings.isEmpty)
 }
 
+@Test func ignoresShellsAndCoreBinariesLeftInBin() {
+    // Closing a terminal leaves its shell reparented to launchd. Nobody wants
+    // to be told about that, and /bin holds nothing but Apple's core tools.
+    let processes = [
+        Fixtures.process(pid: 9500, path: "/bin/zsh", args: ["-zsh"], ageHours: 8),
+        Fixtures.process(pid: 9600, path: "/bin/sleep", args: ["sleep", "9999"], ageHours: 8),
+    ]
+    let findings = OrphanDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(findings.isEmpty)
+}
+
 @Test func ignoresServicesLaunchdManagesOnPurpose() {
     // A LaunchAgent or brew service is indistinguishable from an orphan in the
     // process table: parent 1, no terminal. Only launchd knows the difference.

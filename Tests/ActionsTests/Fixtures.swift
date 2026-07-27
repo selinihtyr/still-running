@@ -53,6 +53,12 @@ enum Fixtures {
                     args: ["Google Chrome Helper (Renderer)", "--type=renderer",
                            "--user-data-dir=/tmp/claude-cdp-prof"],
                     ageHours: ageHours, rssMB: 300),
+            // Observed on a real machine: Chrome omits --user-data-dir from
+            // some helper types. Only the tree says who this belongs to.
+            process(pid: 35771, ppid: 23947,
+                    path: "\(chromeFramework)/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper",
+                    args: ["Google Chrome Helper", "--type=utility"],
+                    ageHours: ageHours, rssMB: 100),
         ]
     }
 

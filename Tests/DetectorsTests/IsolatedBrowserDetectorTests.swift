@@ -35,10 +35,35 @@ import ProcessKit
         Issue.record("expected a process target")
         return
     }
-    #expect(pids.count == 3)
+    #expect(pids.count == 4)
     #expect(pids.first == 23947)                          // root first, so SIGTERM tears down the tree
-    #expect(findings[0].memoryBytes == 750 * 1_048_576)   // aggregated across the tree
-    #expect(findings[0].cpuPercent == 120)                // three processes at 40%
+    #expect(findings[0].memoryBytes == 850 * 1_048_576)   // aggregated across the whole tree
+    #expect(findings[0].cpuPercent == 160)                // four processes at 40%
+}
+
+@Test func includesHelpersThatDoNotCarryTheProfileFlag() {
+    // pid 35771 is a utility helper with no --user-data-dir. It belongs to the
+    // automation profile only by descent, and it must be counted and targeted.
+    let processes = Fixtures.automationChrome() + Fixtures.defaultChrome()
+    let findings = IsolatedBrowserDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 10), settings: Settings())
+
+    guard case .processes(let pids) = findings[0].target else {
+        Issue.record("expected a process target")
+        return
+    }
+    #expect(pids.contains(35771))
+}
+
+@Test func aFlaglessHelperOfTheUsersOwnBrowserIsNeverGrouped() {
+    let processes = Fixtures.automationChrome() + Fixtures.defaultChrome()
+    let isolated = IsolatedBrowserDetector.isolatedPIDs(in: Fixtures.snapshot(processes: processes))
+
+    #expect(isolated.contains(35771))       // automation utility helper
+    #expect(!isolated.contains(14914))      // her browser
+    #expect(!isolated.contains(14920))      // her GPU helper
+    #expect(!isolated.contains(15205))      // her renderer
 }
 
 @Test func ignoresAYoungQuietAutomationBrowser() {

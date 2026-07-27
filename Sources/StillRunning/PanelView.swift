@@ -24,7 +24,6 @@ struct PanelView: View {
             controls
         }
         .frame(width: 340)
-        .task { store.startSampling() }
         .onAppear { store.setPanelOpen(true) }
         .onDisappear { store.setPanelOpen(false) }
         .sheet(isPresented: $showingSettings) { SettingsView(store: store) }
@@ -55,16 +54,31 @@ struct PanelView: View {
         EmptyView()
     }
 
+    /// Rows are laid out plainly up to this count. Beyond it they scroll at a
+    /// fixed height — a ScrollView has no intrinsic height, and a menu bar
+    /// window sizes itself to its content, so an unbounded one collapses to
+    /// nothing and the panel comes up empty.
+    private static let rowsBeforeScrolling = 6
+    private static let scrollHeight: CGFloat = 380
+
     private var findingsList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(store.findings) { finding in
-                    FindingRow(finding: finding, store: store)
-                    if finding.identity != store.findings.last?.identity { Divider() }
-                }
+        Group {
+            if store.findings.count <= Self.rowsBeforeScrolling {
+                rows
+            } else {
+                ScrollView { rows }
+                    .frame(height: Self.scrollHeight)
             }
         }
-        .frame(maxHeight: 320)
+    }
+
+    private var rows: some View {
+        VStack(spacing: 0) {
+            ForEach(store.findings) { finding in
+                FindingRow(finding: finding, store: store)
+                if finding.identity != store.findings.last?.identity { Divider() }
+            }
+        }
     }
 
     private var stopAllButton: some View {

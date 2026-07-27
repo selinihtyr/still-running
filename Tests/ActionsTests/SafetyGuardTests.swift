@@ -76,6 +76,23 @@ private func finding(target: StopTarget, kind: FindingKind = .devServer) -> Find
     try SafetyGuard().vet(finding(target: .processes([23947]), kind: .isolatedBrowser), in: snapshot)
 }
 
+@Test func allowsAFlaglessHelperThatDescendsFromAnAutomationBrowser() throws {
+    // Without tree awareness this helper looks like the user's own browser and
+    // the guard would refuse it, making the whole group unstoppable.
+    let snapshot = Fixtures.snapshot(processes: Fixtures.automationChrome() + Fixtures.defaultChrome())
+
+    try SafetyGuard().vet(
+        finding(target: .processes([23947, 23953, 35770, 35771]), kind: .isolatedBrowser), in: snapshot)
+}
+
+@Test func stillRefusesAFlaglessHelperOfTheUsersOwnBrowser() {
+    let snapshot = Fixtures.snapshot(processes: Fixtures.automationChrome() + Fixtures.defaultChrome())
+
+    #expect(throws: SafetyError.self) {
+        try SafetyGuard().vet(finding(target: .processes([15205]), kind: .isolatedBrowser), in: snapshot)
+    }
+}
+
 @Test func refusesTheWholeGroupWhenOneMemberIsProtected() {
     let snapshot = Fixtures.snapshot(processes: Fixtures.automationChrome() + Fixtures.system())
 

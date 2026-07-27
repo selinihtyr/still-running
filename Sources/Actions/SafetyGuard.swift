@@ -25,16 +25,19 @@ public struct SafetyGuard: Sendable {
         // name a system process, so there is nothing to vet for them.
         guard case .processes(let pids) = finding.target else { return }
 
+        let isolated = IsolatedBrowserDetector.isolatedPIDs(in: snapshot)
         for pid in pids {
             guard let process = snapshot.process(pid: pid) else { throw SafetyError.unknownProcess(pid: pid) }
-            if let reason = protectionReason(for: process, in: snapshot) {
+            if let reason = protectionReason(for: process, in: snapshot, isolatedPIDs: isolated) {
                 throw SafetyError.protectedProcess(pid: pid, reason: reason)
             }
         }
     }
 
     /// Why this process may never be stopped, or nil when it may.
-    public func protectionReason(for process: ProcessSample, in snapshot: Snapshot) -> String? {
+    /// Pass `isolatedPIDs` when vetting several processes, to compute it once.
+    public func protectionReason(for process: ProcessSample, in snapshot: Snapshot,
+                                 isolatedPIDs: Set<Int32>? = nil) -> String? {
         if process.pid < Self.minimumPID { return "system process" }
         if process.pid == snapshot.ownPID { return "Still Running itself" }
         if process.executablePath.contains("Still Running.app") { return "Still Running itself" }
@@ -43,9 +46,9 @@ public struct SafetyGuard: Sendable {
         // the user more than "owned by another user".
         if Self.protectedNames.contains(process.name) { return "critical to the session" }
         if process.uid != snapshot.currentUID { return "owned by another user" }
-        if IsolatedBrowserDetector.isBrowser(process),
-           IsolatedBrowserDetector.isolationSignature(process) == nil {
-            return "your browser, with your tabs"
+        if IsolatedBrowserDetector.isBrowser(process) {
+            let isolated = isolatedPIDs ?? IsolatedBrowserDetector.isolatedPIDs(in: snapshot)
+            if !isolated.contains(process.pid) { return "your browser, with your tabs" }
         }
         return nil
     }

@@ -14,6 +14,11 @@ struct StillRunningApp: App {
             if !store.findings.isEmpty {
                 Text("\(store.findings.count)")
             }
+            // Sampling belongs here rather than on the panel: the label is the
+            // only view that always exists, so the badge is right before the
+            // user has ever opened anything.
+            Color.clear.frame(width: 0, height: 0)
+                .task { store.startSampling() }
         }
         .menuBarExtraStyle(.window)
     }

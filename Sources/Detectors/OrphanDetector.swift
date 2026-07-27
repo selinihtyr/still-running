@@ -9,7 +9,7 @@ public struct OrphanDetector: Detector {
     public init() {}
 
     private static let systemPrefixes = ["/System/", "/Library/", "/usr/libexec/",
-                                         "/usr/sbin/", "/sbin/", "/usr/bin/"]
+                                         "/usr/sbin/", "/sbin/", "/usr/bin/", "/bin/"]
     /// Anything shipped inside a bundle is managed by whatever launched it.
     private static let bundleMarkers = [".app/Contents/", ".xpc/Contents/",
                                         ".appex/Contents/", ".framework/"]
