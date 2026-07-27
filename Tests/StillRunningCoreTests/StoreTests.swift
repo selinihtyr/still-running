@@ -99,9 +99,11 @@ private func makeStore(_ name: String, stopper: any Stopping = SpyStopper(),
 /// A store over containers: its findings stop immediately and can be undone.
 @MainActor
 private func makeContainerStore(_ name: String, stopper: any Stopping = SpyStopper(),
-                                restarter: any Restarting = SpyRestarter()) -> Store {
+                                restarter: any Restarting = SpyRestarter(),
+                                undoWindow: TimeInterval = 120) -> Store {
     Store(source: ScriptedSource(snapshots: manyContainerSnapshots()),
-          stopper: stopper, restarter: restarter, defaults: cleanDefaults(name))
+          stopper: stopper, restarter: restarter, defaults: cleanDefaults(name),
+          undoWindow: undoWindow)
 }
 
 private func manyContainerSnapshots() -> [Snapshot] {
@@ -214,6 +216,29 @@ private func manyContainerSnapshots() -> [Snapshot] {
 
     await store.stop(store.findings[0])
     try? await Task.sleep(for: .milliseconds(300))
+
+    #expect(store.undoable.isEmpty)
+}
+
+@MainActor
+@Test func theOfferToStartAgainExpiresOnItsOwn() async {
+    let store = makeContainerStore("store-18", undoWindow: 0.2)
+    await store.refresh(); await store.refresh()
+
+    await store.stop(store.findings[0])
+    #expect(store.undoable.count == 1)
+
+    try? await Task.sleep(for: .milliseconds(400))
+    #expect(store.undoable.isEmpty)
+}
+
+@MainActor
+@Test func theOfferToStartAgainCanBeDismissedByHand() async {
+    let store = makeContainerStore("store-19")
+    await store.refresh(); await store.refresh()
+
+    await store.stop(store.findings[0])
+    store.dismissUndo(store.undoable[0])
 
     #expect(store.undoable.isEmpty)
 }

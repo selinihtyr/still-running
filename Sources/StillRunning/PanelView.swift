@@ -198,6 +198,15 @@ struct PanelView: View {
                         Button("Start again") { Task { await store.undo(stopped) } }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                        Button {
+                            store.dismissUndo(stopped)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.tertiary)
+                        .help("Dismiss")
                     }
                 }
             }

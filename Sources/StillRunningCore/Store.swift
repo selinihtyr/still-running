@@ -85,7 +85,7 @@ public final class Store {
                 defaults: UserDefaults = .standard,
                 notifier: Notifier = Notifier(),
                 cancellationWindow: TimeInterval = 3,
-                undoWindow: TimeInterval = 20) {
+                undoWindow: TimeInterval = 120) {
         let settingsStore = SettingsStore(defaults: defaults)
         self.source = source
         self.stopper = stopper
