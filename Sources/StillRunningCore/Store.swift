@@ -21,6 +21,8 @@ public final class Store {
     /// Findings that survived a graceful stop and may be force quit.
     public private(set) var forceableIdentities: Set<String> = []
     public private(set) var lastError: String?
+    /// When the machine was last looked at, for the panel's footer.
+    public private(set) var lastSampledAt: Date?
 
     public var settings: Settings {
         didSet { settingsStore.settings = settings }
@@ -56,6 +58,7 @@ public final class Store {
     public func refresh() async {
         let snapshot = await source.sample()
         latest = snapshot
+        lastSampledAt = snapshot.takenAt
         history.record(snapshot)
 
         let result = engine.evaluate(snapshot: snapshot, history: history,

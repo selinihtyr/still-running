@@ -30,7 +30,7 @@ public struct IsolatedBrowserDetector: Detector {
                 identity: "browser:\(signature)",
                 kind: .isolatedBrowser,
                 title: "\(Self.browserName(root)) · automation profile",
-                detail: "\(Formatting.duration(age)) · \(signature)",
+                detail: signature,
                 cpuPercent: cpu,
                 memoryBytes: memory,
                 age: age,

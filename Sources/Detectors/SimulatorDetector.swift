@@ -16,9 +16,8 @@ public struct SimulatorDetector: Detector {
             return Finding(
                 identity: "simulator:\(simulator.id)",
                 kind: .simulator,
-                title: "\(simulator.name) · simulator",
-                detail: age.map { "booted \(Formatting.duration($0)) ago · \(simulator.runtime)" }
-                    ?? "booted · \(simulator.runtime)",
+                title: simulator.name,
+                detail: age == nil ? "\(simulator.runtime) · booted, start time unknown" : simulator.runtime,
                 cpuPercent: 0,
                 memoryBytes: 0,
                 age: age ?? 0,

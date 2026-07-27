@@ -31,8 +31,8 @@ public struct OrphanDetector: Detector {
             return Finding(
                 identity: "orphan:\(process.executablePath)",
                 kind: .orphan,
-                title: "\(process.name) · no terminal",
-                detail: "\(Formatting.duration(age)) · adopted by launchd",
+                title: process.name,
+                detail: "no terminal, adopted by launchd",
                 cpuPercent: cpu,
                 memoryBytes: process.residentBytes,
                 age: age,

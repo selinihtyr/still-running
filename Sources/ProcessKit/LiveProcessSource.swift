@@ -82,7 +82,10 @@ public struct LiveProcessSource: Sendable {
             var read: Int32 = 0
             while cursor < end, read < argc {
                 let argument = String(cString: cursor)
-                result.append(argument)
+                // Tools that rewrite their own process title (npm, and anything
+                // using setproctitle) leave empty slots behind. They are never
+                // meaningful and they confuse anything reading argv positionally.
+                if !argument.isEmpty { result.append(argument) }
                 cursor += argument.utf8.count + 1
                 read += 1
             }

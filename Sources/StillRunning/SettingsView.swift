@@ -17,6 +17,11 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Text("Still Running watches for things you started earlier and never stopped.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
             Picker("Consider forgotten after", selection: ageBinding) {
                 ForEach(ageChoices, id: \.value) { Text($0.label).tag($0.value) }
             }
@@ -28,12 +33,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 380)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { dismiss() }
-            }
-        }
+        .frame(width: 420, height: 300)
         .onChange(of: store.settings.notifyAfter) { _, new in
             if new != nil { Notifier.requestAuthorization() }
         }

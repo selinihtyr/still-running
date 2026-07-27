@@ -21,5 +21,13 @@ struct StillRunningApp: App {
                 .task { store.startSampling() }
         }
         .menuBarExtraStyle(.window)
+
+        // Settings live in their own window. A sheet presented from the menu
+        // bar panel dies with the panel the moment it loses focus.
+        Window("Still Running Settings", id: "settings") {
+            SettingsView(store: store)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 }

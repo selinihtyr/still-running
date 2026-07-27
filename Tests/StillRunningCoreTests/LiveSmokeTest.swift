@@ -18,7 +18,10 @@ import ProcessKit
 
     print("--- findings ---")
     for finding in result.findings {
-        print("  [\(finding.kind.rawValue)] \(finding.title) | \(finding.detail) | \(Int(finding.cpuPercent))%")
+        print("  [\(finding.kind.rawValue)] \(finding.title) | \(finding.detail) | \(Int(finding.cpuPercent))% | \(finding.target)")
+        if case .processes(let pids) = finding.target {
+            for pid in pids { print("        pid \(pid): \(latest.process(pid: pid)?.executablePath ?? "?") \((latest.process(pid: pid)?.arguments ?? []).joined(separator: " ").prefix(120))") }
+        }
     }
     print("--- also hot ---")
     for hot in result.alsoHot { print("  \(hot.name) \(Int(hot.cpuPercent))%") }

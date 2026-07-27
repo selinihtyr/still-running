@@ -17,8 +17,8 @@ public struct ContainerDetector: Detector {
             return Finding(
                 identity: "container:\(container.name)",
                 kind: .container,
-                title: "\(container.name) · container",
-                detail: "up \(Formatting.duration(age)) · \(container.image)",
+                title: container.name,
+                detail: container.image,
                 cpuPercent: 0,
                 memoryBytes: 0,
                 age: age,
