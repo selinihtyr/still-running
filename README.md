@@ -41,8 +41,7 @@ a brief spike never puts anything on the list.
 
 ## What it will never do
 
-- **Never deletes anything.** It stops things. Every action is undone by starting
-  the thing again.
+- **Never deletes anything.** It stops things.
 - **Never touches your browser's own tabs.** Only isolated and automation
   profiles are ever offered. A browser on its normal profile is refused at two
   separate layers.
@@ -52,8 +51,23 @@ a brief spike never puts anything on the list.
 - **Never asks for privileges.** No root, no Accessibility, no Full Disk Access,
   no login item. It reads the process table, which any process may do.
 
-Processes it cannot vouch for appear under "Also busy, but yours" — visible, but
-with no button next to them.
+Processes it cannot vouch for appear under "Busy, but yours" — visible, but with
+no button next to them.
+
+## Getting it wrong
+
+Every stop has a way back, and each kind gets the most honest one available.
+
+A **container or simulator** stops right away and then offers to start it again
+for two minutes. That is a real undo: `docker start` and `simctl boot` bring
+back exactly what was there.
+
+A **process** cannot be undone. Re-running an argument vector is not the same
+program in the same state, and a signal cannot be recalled. So the way back
+comes first instead: the click starts a three second countdown that can be
+cancelled before anything is sent.
+
+**Stop all** asks before it acts, and lists what will go.
 
 ## Install
 
@@ -66,7 +80,7 @@ It lives in the menu bar. There is no Dock icon and no window.
 ## Build from source
 
 ```bash
-swift test          # 116 tests, no network, no side effects
+swift test          # 138 tests, no network, no side effects
 ./scripts/bundle.sh # produces build/Still Running.app
 ```
 
