@@ -4,3 +4,7 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# Release artefacts
+Still-Running.dmg
+dmg/
