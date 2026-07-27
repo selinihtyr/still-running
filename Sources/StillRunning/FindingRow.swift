@@ -16,12 +16,13 @@ struct FindingRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 icon
                 titles
                 Spacer(minLength: 8)
                 figures
                 action
+                more
             }
             // With a single finding there is nothing to compare against, and a
             // lone bar reads as a progress bar rather than a scale.
@@ -121,14 +122,27 @@ struct FindingRow: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
-            if hovering && !store.isStopping(finding) {
-                Button("Ignore") { store.keep(finding) }
-                    .buttonStyle(.plain)
-                    .font(.rowDetail)
-                    .foregroundStyle(.secondary)
-                    .help("Never list this again. It keeps running — this only stops the reminder.")
-            }
         }
+    }
+
+    /// Secondary actions live behind the ellipsis, where they read as actions
+    /// rather than as another line of text in the row.
+    private var more: some View {
+        Menu {
+            Button("Never list this again") { store.keep(finding) }
+            if canForce {
+                Button("Force quit now") { Task { await store.forceStop(finding) } }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 11, weight: .semibold))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 16)
+        .opacity(hovering ? 1 : 0.4)
+        .disabled(store.isStopping(finding))
+        .help("More for \(finding.title)")
     }
 
     private var showsRail: Bool { store.findings.count > 1 && longestAge > 0 }
