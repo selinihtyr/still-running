@@ -63,6 +63,18 @@ import ProcessKit
     #expect(findings.isEmpty)
 }
 
+@Test func ignoresANodeDaemonInstalledAsALaunchAgent() {
+    let process = Fixtures.process(
+        pid: 504, path: "/opt/homebrew/bin/node", args: ["node", "bot.js"], ageHours: 53)
+    let snapshot = Snapshot(takenAt: Fixtures.now, processes: [process], containers: [],
+                            simulators: [], currentUID: 501, ownPID: 999, managedPIDs: [504])
+
+    let findings = DevServerDetector().findings(
+        in: snapshot, history: Fixtures.history([process], cpuPercent: 1), settings: Settings())
+
+    #expect(findings.isEmpty)
+}
+
 @Test func devServerIdentityIgnoresTheChosenPort() {
     // Restarting on another port must not read as a different thing.
     let first = [Fixtures.process(pid: 4700, path: "/opt/homebrew/bin/node",

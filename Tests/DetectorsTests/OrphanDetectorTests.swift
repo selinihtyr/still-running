@@ -57,6 +57,79 @@ import ProcessKit
     #expect(findings.isEmpty)
 }
 
+@Test func ignoresAppleXPCServicesUnderLibraryDeveloper() {
+    // Observed on a real machine: CoreSimulator and CoreDevice ship XPC
+    // services that launchd owns forever. They are not leftovers, and they
+    // live in .xpc bundles rather than .app bundles.
+    let processes = [
+        Fixtures.process(
+            pid: 1415,
+            path: "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/XPCServices/com.apple.CoreSimulator.CoreSimulatorService.xpc/Contents/MacOS/com.apple.CoreSimulator.CoreSimulatorService",
+            args: ["com.apple.CoreSimulator.CoreSimulatorService"], ageHours: 52),
+        Fixtures.process(
+            pid: 1427,
+            path: "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/XPCServices/SimulatorTrampoline.xpc/Contents/MacOS/SimulatorTrampoline",
+            args: ["SimulatorTrampoline"], ageHours: 52),
+    ]
+    let findings = OrphanDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(findings.isEmpty)
+}
+
+@Test func ignoresAppExtensionsAndFrameworkHelpers() {
+    let processes = [
+        Fixtures.process(pid: 9100,
+                         path: "/Applications/Some.app/Contents/PlugIns/Helper.appex/Contents/MacOS/Helper",
+                         args: ["Helper"], ageHours: 10),
+        Fixtures.process(pid: 9200,
+                         path: "/Library/Frameworks/Thing.framework/Versions/A/Helper",
+                         args: ["Helper"], ageHours: 10),
+    ]
+    let findings = OrphanDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(findings.isEmpty)
+}
+
+@Test func ignoresServicesLaunchdManagesOnPurpose() {
+    // A LaunchAgent or brew service is indistinguishable from an orphan in the
+    // process table: parent 1, no terminal. Only launchd knows the difference.
+    let process = Fixtures.process(
+        pid: 512, path: "/Users/x/.rvmp/dist/darwin-arm64/bin/rvmp", args: ["rvmp"], ageHours: 53)
+    let snapshot = Snapshot(takenAt: Fixtures.now, processes: [process], containers: [],
+                            simulators: [], currentUID: 501, ownPID: 999, managedPIDs: [512])
+
+    let findings = OrphanDetector().findings(
+        in: snapshot, history: Fixtures.history([process], cpuPercent: 0), settings: Settings())
+
+    #expect(findings.isEmpty)
+}
+
+@Test func stillFlagsAnUnmanagedProcessWhenOtherJobsAreManaged() {
+    let process = Fixtures.process(
+        pid: 9400, path: "/Users/x/bin/leftover", args: ["leftover"], ageHours: 6)
+    let snapshot = Snapshot(takenAt: Fixtures.now, processes: [process], containers: [],
+                            simulators: [], currentUID: 501, ownPID: 999, managedPIDs: [512, 504])
+
+    let findings = OrphanDetector().findings(
+        in: snapshot, history: Fixtures.history([process], cpuPercent: 0), settings: Settings())
+
+    #expect(findings.count == 1)
+}
+
+@Test func stillFlagsAPlainBinaryInAUserDirectory() {
+    let processes = [Fixtures.process(
+        pid: 9300, path: "/Users/x/.bun/bin/bun", args: ["bun", "run", "worker.ts"], ageHours: 6)]
+    let findings = OrphanDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(findings.count == 1)
+}
+
 @Test func leavesAutomationBrowsersToTheBrowserDetector() {
     let processes = Fixtures.automationChrome()
     let findings = OrphanDetector().findings(

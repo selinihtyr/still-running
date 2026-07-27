@@ -1,0 +1,28 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Bundle
+        run: ./scripts/bundle.sh release
+      - name: Create DMG
+        run: |
+          mkdir -p dmg
+          cp -R "build/Still Running.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Still Running" -srcfolder dmg \
+            -ov -format UDZO "Still-Running.dmg"
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Still-Running.dmg
+          generate_release_notes: true

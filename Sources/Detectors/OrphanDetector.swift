@@ -8,7 +8,11 @@ public struct OrphanDetector: Detector {
 
     public init() {}
 
-    private static let systemPrefixes = ["/System/", "/usr/libexec/", "/usr/sbin/", "/sbin/", "/usr/bin/"]
+    private static let systemPrefixes = ["/System/", "/Library/", "/usr/libexec/",
+                                         "/usr/sbin/", "/sbin/", "/usr/bin/"]
+    /// Anything shipped inside a bundle is managed by whatever launched it.
+    private static let bundleMarkers = [".app/Contents/", ".xpc/Contents/",
+                                        ".appex/Contents/", ".framework/"]
 
     public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
         snapshot.processes.compactMap { process -> Finding? in
@@ -16,7 +20,8 @@ public struct OrphanDetector: Detector {
                   process.pid != snapshot.ownPID,
                   process.ppid == 1,
                   !process.hasControllingTTY,
-                  !Self.isApplicationBundle(process),
+                  !snapshot.managedPIDs.contains(process.pid),   // a service, not a stray
+                  !Self.isBundled(process),
                   !Self.isSystemPath(process.executablePath),
                   !IsolatedBrowserDetector.isBrowser(process)   // the browser detector owns those
             else { return nil }
@@ -37,9 +42,10 @@ public struct OrphanDetector: Detector {
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }
 
-    /// Anything inside a .app is a normal application, not a stray command.
-    static func isApplicationBundle(_ process: ProcessSample) -> Bool {
-        process.executablePath.contains(".app/Contents/")
+    /// Anything inside a bundle — an app, an XPC service, an extension, a
+    /// framework helper — is a managed component, not a stray command.
+    static func isBundled(_ process: ProcessSample) -> Bool {
+        bundleMarkers.contains { process.executablePath.contains($0) }
     }
 
     static func isSystemPath(_ path: String) -> Bool {

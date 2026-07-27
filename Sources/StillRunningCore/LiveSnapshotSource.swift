@@ -11,13 +11,16 @@ public struct LiveSnapshotSource: SnapshotSource {
     private let processes: LiveProcessSource
     private let docker: DockerClient?
     private let simulators: any SimulatorControl
+    private let launchd: any LaunchdJobSource
 
     public init(processes: LiveProcessSource = LiveProcessSource(),
                 docker: DockerClient? = DockerClient.discover(),
-                simulators: any SimulatorControl = SimctlSource()) {
+                simulators: any SimulatorControl = SimctlSource(),
+                launchd: any LaunchdJobSource = LaunchctlJobs()) {
         self.processes = processes
         self.docker = docker
         self.simulators = simulators
+        self.launchd = launchd
     }
 
     public func sample() async -> Snapshot {
@@ -31,14 +34,15 @@ public struct LiveSnapshotSource: SnapshotSource {
             containers: containers,
             simulators: devices,
             currentUID: getuid(),
-            ownPID: ProcessInfo.processInfo.processIdentifier
+            ownPID: ProcessInfo.processInfo.processIdentifier,
+            managedPIDs: launchd.managedPIDs()
         )
     }
 
     private func containerSamples() async -> [ContainerSample] {
         guard let docker, let running = try? await docker.containers() else { return [] }
         return running.map {
-            ContainerSample(id: $0.id, name: $0.displayName, image: $0.image, startedAt: $0.created)
+            ContainerSample(id: $0.id, name: $0.displayName, image: $0.image, startedAt: $0.runningSince)
         }
     }
 

@@ -24,6 +24,7 @@ public struct DevServerDetector: Detector {
     public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
         snapshot.processes.compactMap { process -> Finding? in
             guard process.uid == snapshot.currentUID, process.pid != snapshot.ownPID,
+                  !snapshot.managedPIDs.contains(process.pid),   // a daemon someone installed on purpose
                   let label = Self.label(for: process) else { return nil }
 
             let age = snapshot.takenAt.timeIntervalSince(process.startedAt)

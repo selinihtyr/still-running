@@ -66,6 +66,36 @@ import Foundation
     #expect(containers[0].created == Date(timeIntervalSince1970: 1_785_000_000))
 }
 
+@Test func readsTheStartTimeOfTheCurrentRunFromInspect() throws {
+    // A container created weeks ago but restarted yesterday must report
+    // yesterday. The list endpoint alone would report the creation date.
+    let payload = """
+    {"Id":"abc","State":{"Status":"running","StartedAt":"2026-07-26T20:55:13.045630605Z"}}
+    """
+    let started = try DockerClient.decodeStartedAt(Data(payload.utf8))
+
+    #expect(started == ISO8601DateFormatter().date(from: "2026-07-26T20:55:13Z"))
+}
+
+@Test func toleratesTimestampsWithoutAFractionalPart() {
+    #expect(DockerClient.parseDockerTimestamp("2026-07-26T20:55:13Z")
+            == ISO8601DateFormatter().date(from: "2026-07-26T20:55:13Z"))
+}
+
+@Test func rejectsAnUnparsableTimestamp() {
+    #expect(DockerClient.parseDockerTimestamp("not a date") == nil)
+}
+
+@Test func containerFallsBackToCreationTimeWithoutAStartTime() throws {
+    let payload = """
+    [{"Id":"abc","Names":["/x"],"Image":"i","Created":1785000000,"State":"running"}]
+    """
+    let container = try DockerClient.decodeContainers(Data(payload.utf8))[0]
+
+    #expect(container.started == nil)
+    #expect(container.runningSince == Date(timeIntervalSince1970: 1_785_000_000))
+}
+
 @Test func prefersTheOrbStackSocketWhenSeveralExist() {
     let candidates = DockerClient.socketCandidates(home: "/Users/x")
 

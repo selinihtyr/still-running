@@ -4,12 +4,24 @@ public struct DockerContainer: Sendable, Equatable, Codable {
     public let id: String
     public let names: [String]
     public let image: String
+    /// When the container was created, which may predate its current run.
     public let created: Date
     public let state: String
+    /// When the current run began. Falls back to `created` when the daemon
+    /// cannot be inspected.
+    public private(set) var started: Date?
+
+    public var runningSince: Date { started ?? created }
 
     public var displayName: String {
         let raw = names.first ?? id
         return raw.hasPrefix("/") ? String(raw.dropFirst()) : raw
+    }
+
+    func startedAt(_ date: Date) -> DockerContainer {
+        var copy = self
+        copy.started = date
+        return copy
     }
 
     enum CodingKeys: String, CodingKey {
@@ -34,12 +46,54 @@ public struct DockerClient: Sendable {
             .map(DockerClient.init)
     }
 
+    /// Running containers, each with the time it was last *started*. The list
+    /// endpoint only reports `Created`, which for a restarted container can be
+    /// weeks older than its current run, so start times come from inspect.
     public func containers() async throws -> [DockerContainer] {
         let response = try await http.send(method: "GET", path: "/\(Self.apiVersion)/containers/json")
         guard response.status == 200 else {
             throw HTTPError.status(response.status, String(decoding: response.body, as: UTF8.self))
         }
-        return try Self.decodeContainers(response.body)
+        let listed = try Self.decodeContainers(response.body)
+
+        var result: [DockerContainer] = []
+        result.reserveCapacity(listed.count)
+        for container in listed {
+            let started = (try? await startedAt(id: container.id)) ?? container.created
+            result.append(container.startedAt(started))
+        }
+        return result
+    }
+
+    private func startedAt(id: String) async throws -> Date {
+        let response = try await http.send(method: "GET", path: "/\(Self.apiVersion)/containers/\(id)/json")
+        guard response.status == 200 else {
+            throw HTTPError.status(response.status, String(decoding: response.body, as: UTF8.self))
+        }
+        return try Self.decodeStartedAt(response.body)
+    }
+
+    static func decodeStartedAt(_ data: Data) throws -> Date {
+        struct Payload: Decodable {
+            struct State: Decodable { let startedAt: String
+                enum CodingKeys: String, CodingKey { case startedAt = "StartedAt" } }
+            let state: State
+            enum CodingKeys: String, CodingKey { case state = "State" }
+        }
+        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        guard let date = parseDockerTimestamp(payload.state.startedAt) else {
+            throw HTTPError.malformedResponse
+        }
+        return date
+    }
+
+    /// Docker stamps nanoseconds ("2026-07-26T20:55:13.045630605Z"), which is
+    /// more precision than ISO8601DateFormatter accepts, so the fraction is
+    /// dropped before parsing.
+    static func parseDockerTimestamp(_ raw: String) -> Date? {
+        let whole = raw.split(separator: ".").first.map(String.init) ?? raw
+        let normalised = whole.hasSuffix("Z") ? whole : whole + "Z"
+        return ISO8601DateFormatter().date(from: normalised)
     }
 
     /// Graceful stop. Docker sends SIGTERM, then SIGKILL after `timeout` seconds.

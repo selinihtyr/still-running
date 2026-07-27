@@ -14,7 +14,9 @@ let package = Package(
         .target(name: "Detectors", dependencies: ["ProcessKit"]),
         .target(name: "Actions", dependencies: ["Detectors", "DockerClient", "SimulatorSource"]),
         .target(name: "StillRunningCore", dependencies: ["Actions", "ProcessKit", "DockerClient", "SimulatorSource"]),
-        .executableTarget(name: "StillRunning", dependencies: ["StillRunningCore"]),
+        // Info.plist is consumed by scripts/bundle.sh, not by SwiftPM.
+        .executableTarget(name: "StillRunning", dependencies: ["StillRunningCore"],
+                          exclude: ["Info.plist"]),
         .testTarget(name: "ProcessKitTests", dependencies: ["ProcessKit"]),
         .testTarget(name: "DockerClientTests", dependencies: ["DockerClient"]),
         .testTarget(name: "SimulatorSourceTests", dependencies: ["SimulatorSource"]),

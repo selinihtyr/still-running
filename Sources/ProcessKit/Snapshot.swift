@@ -68,15 +68,19 @@ public struct Snapshot: Codable, Sendable, Equatable {
     public let simulators: [SimulatorSample]
     public let currentUID: UInt32
     public let ownPID: Int32
+    /// Pids launchd manages through a plist. They look like orphans but are not.
+    public let managedPIDs: Set<Int32>
 
     public init(takenAt: Date, processes: [ProcessSample], containers: [ContainerSample],
-                simulators: [SimulatorSample], currentUID: UInt32, ownPID: Int32) {
+                simulators: [SimulatorSample], currentUID: UInt32, ownPID: Int32,
+                managedPIDs: Set<Int32> = []) {
         self.takenAt = takenAt
         self.processes = processes
         self.containers = containers
         self.simulators = simulators
         self.currentUID = currentUID
         self.ownPID = ownPID
+        self.managedPIDs = managedPIDs
     }
 
     public func process(pid: Int32) -> ProcessSample? { processes.first { $0.pid == pid } }
