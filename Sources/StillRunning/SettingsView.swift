@@ -16,7 +16,17 @@ struct SettingsView: View {
     ]
 
     @State private var permission: Notifier.Permission?
+    @State private var soundIsOn = true
     @State private var testing = false
+
+    /// Sound is a separate per-app switch in macOS, so a silent notification is
+    /// worth explaining rather than leaving the user to wonder.
+    private func resultMessage(_ permission: Notifier.Permission) -> String {
+        guard permission == .allowed else { return permission.message }
+        return soundIsOn
+            ? "Sent. If nothing appeared, check Notification Centre."
+            : "Sent, silently: macOS has sound switched off for Still Running. Turn on “Play sound for notifications” in System Settings › Notifications › Still Running."
+    }
 
     var body: some View {
         Form {
@@ -38,6 +48,7 @@ struct SettingsView: View {
                         testing = true
                         Task {
                             permission = await Notifier.sendTest()
+                            soundIsOn = await Notifier.soundIsOn()
                             testing = false
                         }
                     }
@@ -45,9 +56,7 @@ struct SettingsView: View {
                     Spacer()
                 }
                 if let permission {
-                    Text(permission == .allowed
-                         ? "Sent. If nothing appeared, check Notification Centre."
-                         : permission.message)
+                    Text(resultMessage(permission))
                         .font(.system(size: 11))
                         .foregroundStyle(permission == .allowed ? Color.secondary : Color.orange)
                         .fixedSize(horizontal: false, vertical: true)

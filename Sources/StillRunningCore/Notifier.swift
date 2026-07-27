@@ -13,6 +13,9 @@ public struct SystemNotificationPresenter: NotificationPresenting {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
+        // The point of the reminder is that you did not notice. Silence would
+        // defeat it; macOS still has the final say per app.
+        content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
@@ -68,6 +71,12 @@ public struct Notifier: Sendable {
         case .denied: return .blocked
         @unknown default: return .unavailable("unknown status")
         }
+    }
+
+    /// macOS keeps sound as its own per-app switch, separate from permission,
+    /// and it is off by default for some apps.
+    public static func soundIsOn() async -> Bool {
+        await UNUserNotificationCenter.current().notificationSettings().soundSetting == .enabled
     }
 
     /// Asks for permission if needed, then sends one notification so the user
