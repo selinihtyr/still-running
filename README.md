@@ -183,3 +183,8 @@ spawned when a booted device's `launchd_sim` is actually there.
 ## License
 
 MIT.
+
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md) — what changed in each version, in the words of
+someone using it.

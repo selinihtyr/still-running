@@ -17,17 +17,38 @@ jobs:
         run: swift test
       - name: Check it builds and bundles
         run: ./scripts/bundle.sh release
+
+      - name: Take the notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Everything under this version's heading, up to the next one.
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+
+          cat >> notes.md <<'EOF'
+
+          ---
+
+          Install or update:
+
+          ```bash
+          git clone https://github.com/selinihtyr/still-running
+          cd still-running && ./scripts/install.sh
+          ```
+
+          Requires macOS 26 and Xcode 26. There is no download to notarise, so
+          you build it yourself and Gatekeeper stays out of it.
+          EOF
+
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
-          body: |
-            Install or update:
-
-            ```bash
-            git clone https://github.com/selinihtyr/still-running
-            cd still-running && ./scripts/install.sh
-            ```
-
-            Requires macOS 26 and Xcode 26. There is no download to notarise,
-            so you build it yourself and Gatekeeper stays out of it.
+          body_path: notes.md
