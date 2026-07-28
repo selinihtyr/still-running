@@ -24,7 +24,7 @@ private let settings = Settings()
     #expect(findings.count == 1)
     #expect(findings[0].kind == .keepingAwake)
     #expect(findings[0].target == .processes([tool.pid]))
-    #expect(findings[0].title.contains("keeping this Mac awake"))
+    #expect(findings[0].title == "caffeinate · no sleep")
     #expect(findings[0].age == 3 * 3600)
 }
 

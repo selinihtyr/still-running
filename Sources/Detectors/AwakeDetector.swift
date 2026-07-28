@@ -52,7 +52,12 @@ public struct AwakeDetector: Detector {
                 return Finding(
                     identity: "awake:\(signature)",
                     kind: .keepingAwake,
-                    title: "\(process.name) · \(oldest.keepsScreenOn ? "keeping the screen on" : "keeping this Mac awake")",
+                    // Terse on purpose. "keeping this Mac awake" is the true
+                    // sentence and it truncated in the middle of the row on a
+                    // real panel — "caffeinate · k…his Mac awake" — so the row
+                    // says it the way the other kinds do, in two words next to
+                    // an icon, and the explanation underneath says the rest.
+                    title: "\(process.name) · \(oldest.keepsScreenOn ? "screen on" : "no sleep")",
                     detail: sorted.count == 1
                         ? oldest.reason
                         : "\(sorted.count) processes · \(oldest.reason)",
