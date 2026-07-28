@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <sub>Lives in the menu bar. No Dock icon, no window, no account, no login item.</sub>
+  <sub>Lives in the menu bar. No Dock icon, no window, no account.</sub>
 </p>
 
 <p align="center">
@@ -95,7 +95,10 @@ that. They show up under Busy, but yours, with no button.
   is a separate, explicitly labelled action that appears only if the first one
   was ignored.
 - **Never asks for privileges.** No root, no Accessibility, no Full Disk
-  Access, no login item. It reads the process table, which any process may do.
+  Access. It reads the process table, which any process may do.
+- **Never sends anything about you.** The one request it makes is to GitHub's
+  public releases API, once a day, asking for a version number. Switch off
+  **Check for updates** and it never touches the network at all.
 
 Processes it cannot vouch for appear under **Busy, but yours** — visible, but
 with no button next to them.
@@ -124,11 +127,20 @@ Anything you always keep running can be dismissed for good from the row's
   <img src="docs/images/settings.png" width="420" alt="Settings: how long before something counts as forgotten, when to be reminded, and a button that sends a test notification">
 </p>
 
-Two things to set: how long something must run before it counts as forgotten,
-and when to be reminded. Reminders are one quiet notification when something has been running far past
-your threshold, at most once per thing. The test button asks macOS for
+How long something must run before it counts as forgotten, and when to be
+reminded. Reminders are one quiet notification when something has been running
+far past your threshold, at most once per thing. The test button asks macOS for
 permission and reports back exactly what it allows, including whether sound is
 switched off for the app — which macOS keeps as a separate switch.
+
+**Start at login** is on, because an app that notices things you left running
+for hours is worthless if a restart is the end of it. It is one login item and
+the switch turns it off.
+
+**Check for updates** asks GitHub once a day whether a newer release exists. If
+one does, the panel says so, and **Update** opens a Terminal window running the
+same `git pull` and `./scripts/install.sh` from the Install section — where you
+can watch the build and see it fail. Nothing is installed silently.
 
 ## Install
 
@@ -159,7 +171,7 @@ panel and delete `/Applications/Still Running.app`.
 ## Working on it
 
 ```bash
-swift test           # 177 tests, no network, nothing touched
+swift test           # 200 tests, no network, nothing touched
 ./scripts/bundle.sh  # produces build/Still Running.app without installing it
 ```
 

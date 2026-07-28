@@ -14,6 +14,13 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_PATH/StillRunning" "$APP/Contents/MacOS/StillRunning"
 cp "$ROOT/Sources/StillRunning/Info.plist" "$APP/Contents/Info.plist"
 
+# Record the checkout this was built from, so "Update" knows where to run the
+# pull and the installer. An installed app has no other way of knowing, and
+# without it the update button just opens the releases page.
+/usr/libexec/PlistBuddy -c "Add :SRSourceRoot string $ROOT" \
+    "$APP/Contents/Info.plist" >/dev/null 2>&1 ||
+    /usr/libexec/PlistBuddy -c "Set :SRSourceRoot $ROOT" "$APP/Contents/Info.plist"
+
 # Ad-hoc signature. Users right-click and Open the first time; see the README.
 codesign --force --sign - --timestamp=none "$APP"
 

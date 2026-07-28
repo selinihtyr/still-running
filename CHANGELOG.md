@@ -2,6 +2,43 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.4.0] — 2026-07-28
+
+### It survives a restart
+
+Until now, restarting your Mac was the end of it. You would reboot, the menu bar
+would come back without the ring, and nothing would be watching — which is a
+strange failure for an app whose entire job is noticing things you left running
+for hours. Reported by the first person to restart their machine.
+
+It now registers itself as a login item, once, and **Settings › Start at login**
+turns it off. If macOS is blocking it, the switch says so and points at the
+System Settings pane that can let it back in.
+
+### It tells you when there is a new version
+
+The panel shows a strip when a newer release exists, and **Update** opens a
+Terminal window that runs the same two commands the README has always given you:
+`git pull` and `./scripts/install.sh`. In a Terminal rather than silently in the
+background, because a build takes a minute and you should be able to watch it —
+and see it fail.
+
+If the checkout it was built from has moved or gone, it opens the release page
+instead of running an installer from a path that may no longer hold one.
+
+This is the only thing that leaves your machine: one request a day to GitHub's
+public releases API, asking for a version number. Nothing about you is sent, and
+**Settings › Check for updates** turns it off entirely — with it off, the app
+never touches the network at all.
+
+### Settings survive an upgrade
+
+Adding a setting used to throw away every choice you had made. A settings file
+written by an older version has no key for a setting that did not exist yet, and
+the decoder treated that as a corrupt file and started over from the defaults.
+Each field now falls back to its own default, so this one is the last release
+that could have done it to you.
+
 ## [0.3.0] — 2026-07-28
 
 ### It runs on macOS 14 instead of macOS 26

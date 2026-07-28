@@ -91,6 +91,13 @@ public final class Store {
     /// How hard the machine is being pushed right now, refreshed with each sample.
     public private(set) var thermal: Thermal = .current
 
+    /// Whether a newer release exists. `.unknown` until the first answer comes
+    /// back, and the panel shows nothing at all until it is `.available`.
+    public private(set) var update: UpdateStatus = .unknown
+    /// True while the Settings button is waiting on GitHub, so a manual check
+    /// visibly does something.
+    public private(set) var isCheckingForUpdate = false
+
     public init(source: any SnapshotSource = LiveSnapshotSource(),
                 stopper: any Stopping = StopCoordinator(),
                 restarter: any Restarting = RestartCoordinator(),
@@ -116,6 +123,8 @@ public final class Store {
     /// permission the app then never uses would be a worse first impression
     /// than not asking at all.
     public func prepareFirstRun() {
+        ensureItSurvivesARestart()
+
         let key = "hasLaunchedBefore"
         guard !defaults.bool(forKey: key) else { return }
         defaults.set(true, forKey: key)
@@ -125,6 +134,42 @@ public final class Store {
         settings = updated
 
         notifier.requestAuthorization()
+    }
+
+    /// Registered once — on a fresh install, or on the first launch of a version
+    /// that has this — and never again, so switching it off in Settings sticks.
+    private func ensureItSurvivesARestart() {
+        let key = "hasRegisteredLoginItem"
+        guard !defaults.bool(forKey: key), LoginItem.isAvailable else { return }
+        defaults.set(true, forKey: key)
+        LoginItem.setEnabled(true)
+    }
+
+    /// Asks GitHub for the latest release tag: on launch, then once a day, and
+    /// on demand from Settings. Nothing is sent but the request itself, and it
+    /// only happens while the setting is on.
+    public func checkForUpdate(force: Bool = false) async {
+        let key = "lastUpdateCheck"
+        guard settings.checksForUpdates || force else {
+            update = .unknown
+            return
+        }
+        let last = defaults.object(forKey: key) as? Date
+        guard force || UpdateChecker.isDue(lastChecked: last, now: .now, every: 86_400) else { return }
+
+        isCheckingForUpdate = true
+        defer { isCheckingForUpdate = false }
+        let result = await UpdateChecker().check()
+        // A failed check must not park the next one a day away.
+        if result != .unknown { defaults.set(Date(), forKey: key) }
+        update = result
+    }
+
+    /// Runs the pull and the installer in a Terminal window, or opens the
+    /// release page if the checkout it was built from has moved.
+    public func installUpdate() {
+        guard case .available(let found) = update else { return }
+        Updater.install(fallbackPage: found.pageURL)
     }
 
     private func expireUndo(_ identity: String) {

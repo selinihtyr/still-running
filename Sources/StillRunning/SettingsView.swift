@@ -18,6 +18,8 @@ struct SettingsView: View {
     @State private var permission: Notifier.Permission?
     @State private var soundIsOn = true
     @State private var testing = false
+    @State private var loginItem = LoginItem.state
+    @State private var checkedForUpdates = false
 
     /// Sound is a separate per-app switch in macOS, so a silent notification is
     /// worth explaining rather than leaving the user to wonder.
@@ -40,6 +42,43 @@ struct SettingsView: View {
             }
             Picker("Notify me", selection: notifyBinding) {
                 ForEach(notifyChoices, id: \.label) { Text($0.label).tag($0.value) }
+            }
+
+            Section {
+                Toggle("Start at login", isOn: loginBinding)
+                    .disabled(loginItem == .unavailable)
+                if let explanation = loginItem.explanation {
+                    Text(explanation)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("It watches for things left running for hours, so it has to outlive a restart.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Toggle("Check for updates", isOn: updateBinding)
+                HStack {
+                    Button(store.isCheckingForUpdate ? "Checking…" : "Check now") {
+                        Task {
+                            await store.checkForUpdate(force: true)
+                            checkedForUpdates = true
+                        }
+                    }
+                    .disabled(store.isCheckingForUpdate)
+                    Spacer()
+                    if case .available(let found) = store.update {
+                        Button("Update to \(found.version.description)") { store.installUpdate() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                Text(updateMessage)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section {
@@ -67,10 +106,37 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 300)
+        .frame(width: 440, height: 560)
+        .onAppear { loginItem = LoginItem.state }
         .onChange(of: store.settings.notifyAfter) { _, new in
             if new != nil { Notifier.requestAuthorization() }
         }
+    }
+
+    /// The one thing that leaves the machine, said plainly.
+    private var updateMessage: String {
+        switch store.update {
+        case .available:
+            "Updating runs git pull and ./scripts/install.sh in a Terminal window."
+        case .upToDate:
+            "You are on the newest release. One request a day to GitHub's public releases API; nothing about you is sent."
+        case .unknown:
+            checkedForUpdates
+                ? "Could not reach GitHub. Nothing is assumed either way."
+                : "One request a day to GitHub's public releases API, asking only for the latest version number. Switch it off and the app never touches the network."
+        }
+    }
+
+    private var loginBinding: Binding<Bool> {
+        Binding(get: { loginItem.isOn }, set: { loginItem = LoginItem.setEnabled($0) })
+    }
+
+    private var updateBinding: Binding<Bool> {
+        Binding(get: { store.settings.checksForUpdates },
+                set: { on in
+                    store.settings.checksForUpdates = on
+                    if on { Task { await store.checkForUpdate(force: true) } }
+                })
     }
 
     private var ageBinding: Binding<TimeInterval> {

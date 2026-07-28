@@ -30,6 +30,7 @@ struct PanelView: View {
 
             undoStrip
             AlsoHotSection(processes: store.alsoHot)
+            updateStrip
 
             Divider()
             footer
@@ -234,6 +235,33 @@ struct PanelView: View {
                         .help("Dismiss")
                     }
                 }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+    }
+
+    /// Only ever appears when there is genuinely a newer release. An update
+    /// runs the same pull and installer the README documents, in a Terminal
+    /// window you can watch.
+    @ViewBuilder private var updateStrip: some View {
+        if case .available(let found) = store.update {
+            Divider()
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Version \(found.version.description) is out")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("Opens a Terminal window and builds it")
+                        .font(.rowDetail)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button("Update") { store.installUpdate() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

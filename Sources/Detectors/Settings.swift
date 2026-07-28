@@ -15,8 +15,33 @@ public struct Settings: Codable, Sendable, Equatable {
     public var activityWindow: TimeInterval = 600
     /// Opt-in. Nil means no notifications.
     public var notifyAfter: TimeInterval?
+    /// One request a day to GitHub's public releases API. Off means the app
+    /// never touches the network at all.
+    public var checksForUpdates: Bool = true
 
     public init() {}
+
+    /// Decoded field by field, each falling back to its default. The synthesised
+    /// decoder throws on a key it has never seen, which would mean every
+    /// settings file written by an older version failed to load and silently
+    /// reset — so adding a setting would quietly undo the user's choices.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            ((try? container.decodeIfPresent(T.self, forKey: key)) ?? nil) ?? fallback
+        }
+        let blank = Settings()
+        minimumAge = value(.minimumAge, blank.minimumAge)
+        sustainedCPUPercent = value(.sustainedCPUPercent, blank.sustainedCPUPercent)
+        sustainedCPUWindow = value(.sustainedCPUWindow, blank.sustainedCPUWindow)
+        idleCPUPercent = value(.idleCPUPercent, blank.idleCPUPercent)
+        idleWindow = value(.idleWindow, blank.idleWindow)
+        idleMemoryBytes = value(.idleMemoryBytes, blank.idleMemoryBytes)
+        activeCPUPercent = value(.activeCPUPercent, blank.activeCPUPercent)
+        activityWindow = value(.activityWindow, blank.activityWindow)
+        notifyAfter = try? container.decodeIfPresent(TimeInterval.self, forKey: .notifyAfter)
+        checksForUpdates = value(.checksForUpdates, blank.checksForUpdates)
+    }
 
     /// True when something this old, this busy, and this large is worth surfacing.
     public func crossesThreshold(age: TimeInterval, sustainedCPU: Double?,

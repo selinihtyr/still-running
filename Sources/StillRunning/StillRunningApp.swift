@@ -23,6 +23,7 @@ struct StillRunningApp: App {
                 .task {
                     store.prepareFirstRun()
                     store.startSampling()
+                    await store.checkForUpdate()
                 }
         }
         .menuBarExtraStyle(.window)
