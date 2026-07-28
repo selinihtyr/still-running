@@ -66,16 +66,21 @@ public struct Finding: Sendable, Identifiable, Equatable {
     public let revealPath: String?
     /// Everything worth pasting into an issue or a terminal.
     public let details: String
+    /// The command that started this, as it was typed or generated. The most
+    /// direct answer there is to "what is this thing".
+    public let command: String?
 
     public var id: String { identity }
 
     public init(identity: String, kind: FindingKind, title: String, detail: String,
                 cpuPercent: Double, memoryBytes: UInt64, age: TimeInterval,
                 target: StopTarget, severity: Severity,
-                explanation: String = "", revealPath: String? = nil, details: String = "") {
+                explanation: String = "", revealPath: String? = nil, details: String = "",
+                command: String? = nil) {
         self.explanation = explanation.isEmpty ? kind.plainDescription : explanation
         self.revealPath = revealPath
         self.details = details
+        self.command = command
         self.identity = identity
         self.kind = kind
         self.title = title

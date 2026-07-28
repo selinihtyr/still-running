@@ -41,23 +41,44 @@ public struct IsolatedBrowserDetector: Detector {
                 severity: cpu >= 50 ? .urgent : .notable,
                 explanation: Self.explain(signature: signature, group: group),
                 revealPath: signature.hasPrefix("/") ? signature : nil,
-                details: Self.details(signature: signature, group: sorted))
+                details: Self.details(signature: signature, group: sorted),
+                command: root.arguments.joined(separator: " "))
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }
 
+    /// Tools that leave browsers behind put their own name in the profile path
+    /// or the command line, which is the only honest way to answer "where did
+    /// this come from" without guessing.
+    static let knownTools: [(marker: String, name: String)] = [
+        ("claude", "Claude Code"), ("playwright", "Playwright"), ("puppeteer", "Puppeteer"),
+        ("selenium", "Selenium"), ("chromedriver", "ChromeDriver"), ("cypress", "Cypress"),
+        ("lighthouse", "Lighthouse"), ("webdriver", "WebDriver"), ("scrapy", "Scrapy"),
+    ]
+
+    static func likelyTool(signature: String, group: [ProcessSample]) -> String? {
+        let haystack = (signature + " " + group.flatMap(\.arguments).joined(separator: " ")).lowercased()
+        return knownTools.first { haystack.contains($0.marker) }?.name
+    }
+
     /// Says what the profile is and, where the path gives it away, who left it.
     static func explain(signature: String, group: [ProcessSample]) -> String {
-        let base = FindingKind.isolatedBrowser.plainDescription
-        let count = group.count == 1 ? "one process" : "\(group.count) processes"
+        var sentences = [FindingKind.isolatedBrowser.plainDescription]
 
+        if let tool = likelyTool(signature: signature, group: group) {
+            sentences.append("The name in its profile path says \(tool) started it.")
+        }
         if signature == "headless" {
-            return "\(base) This one is headless, so there is no window to close. \(count.capitalized)."
+            sentences.append("It is headless, so there is no window to close.")
+        } else if signature == "remote-debugging" {
+            sentences.append("It was started with a debugging port open, which is what test and scraping tools do.")
+        } else if signature.hasPrefix("/tmp/") || signature.hasPrefix("/private/tmp/") {
+            sentences.append("Its profile is in a temporary folder, so nothing in it was meant to be kept.")
         }
-        if signature == "remote-debugging" {
-            return "\(base) It was started with a debugging port open, which is what test and scraping tools do. \(count.capitalized)."
-        }
-        return "\(base) Its profile lives at \(signature), which is where whatever started it put it. \(count.capitalized)."
+        sentences.append(group.count == 1
+            ? "One process."
+            : "\(group.count) processes: the browser and its helpers.")
+        return sentences.joined(separator: " ")
     }
 
     static func details(signature: String, group: [ProcessSample]) -> String {

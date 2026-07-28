@@ -8,27 +8,72 @@ struct FindingRow: View {
     @Bindable var store: Store
 
     @State private var hovering = false
-
     private var canForce: Bool { store.forceableIdentities.contains(finding.identity) }
     private var accent: Color { Theme.accent(for: finding) }
 
+    @State private var expanded = false
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            icon
-            titles
-            Spacer(minLength: 8)
-            figures
-            action
-            more
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
+                icon
+                titles
+                Spacer(minLength: 8)
+                figures
+                action
+                more
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(hovering ? Color.primary.opacity(0.06) : .clear)
+            .contentShape(.rect)
+            .onHover { hovering = $0 }
+            // A path is an identifier, not an explanation, and a tooltip only
+            // helps someone who already suspects there is one. The answer to
+            // "what is this" is one click away, in the panel.
+            .onTapGesture { withAnimation(.smooth(duration: 0.2)) { expanded.toggle() } }
+
+            if expanded { expansion }
+        }
+    }
+
+    private var expansion: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(finding.explanation)
+                .font(.rowDetail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let command = finding.command, !command.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("STARTED BY")
+                        .font(.eyebrow)
+                        .tracking(0.8)
+                        .foregroundStyle(.tertiary)
+                    Text(command)
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if let path = finding.revealPath {
+                Button {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+                } label: {
+                    Label(path, systemImage: "folder")
+                        .font(.rowDetail)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .buttonStyle(.link)
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(hovering ? Color.primary.opacity(0.06) : .clear)
-        .contentShape(.rect)
-        .onHover { hovering = $0 }
-        // A profile path or a container name is an identifier, not an
-        // explanation. Resting on the row says what the thing actually is.
-        .help(finding.explanation)
+        .padding(.bottom, 10)
+        .padding(.leading, 34)
     }
 
     private var icon: some View {

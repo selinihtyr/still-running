@@ -44,7 +44,8 @@ public struct TunnelDetector: Detector {
                     Tunnel: \(process.name)
                     pid \(process.pid)
                     \(process.executablePath) \(process.arguments.dropFirst().joined(separator: " "))
-                    """)
+                    """,
+                command: process.arguments.joined(separator: " "))
         }
         .sorted { $0.age > $1.age }
     }

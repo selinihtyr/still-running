@@ -45,7 +45,8 @@ public struct OrphanDetector: Detector {
                     pid \(process.pid)
                     \(process.executablePath)
                     \(process.arguments.joined(separator: " "))
-                    """)
+                    """,
+                command: process.arguments.joined(separator: " "))
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }

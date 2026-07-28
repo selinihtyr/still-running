@@ -76,7 +76,8 @@ public struct DevServerDetector: Detector {
                 explanation: Self.explain(group: group, label: label,
                                           window: settings.activityWindow),
                 revealPath: Self.projectDirectory(in: group),
-                details: Self.details(label: label, group: group))
+                details: Self.details(label: label, group: group),
+                command: seed.arguments.joined(separator: " "))
         }
         .sorted { $0.cpuPercent > $1.cpuPercent }
     }

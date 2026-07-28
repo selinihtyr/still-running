@@ -165,15 +165,44 @@ private func emulatorProcesses(ageHours: Double = 6) -> [ProcessSample] {
     }
 }
 
-@Test func anAutomationBrowserPointsAtItsProfileOnDisk() {
+@Test func anAutomationBrowserSaysWhatStartedItAndWhereItLives() {
+    // The path is already on the row and behind the Finder link. What the row
+    // could not answer was "where did this come from".
     let processes = Fixtures.automationChrome()
     let findings = IsolatedBrowserDetector().findings(
         in: Fixtures.snapshot(processes: processes),
         history: Fixtures.history(processes, cpuPercent: 10), settings: Settings())
 
     #expect(findings[0].revealPath == "/tmp/claude-cdp-prof")
-    #expect(findings[0].explanation.contains("/tmp/claude-cdp-prof"))
+    #expect(findings[0].explanation.contains("Claude Code"))
+    #expect(findings[0].explanation.contains("temporary folder"))
+    #expect(findings[0].command?.contains("--user-data-dir=/tmp/claude-cdp-prof") == true)
     #expect(findings[0].details.contains("pid 23947"))
+}
+
+@Test func namesTheToolFromACommandLineWhenThePathDoesNotSayIt() {
+    let processes = [Fixtures.process(
+        pid: 9100, path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        args: ["Google Chrome", "--user-data-dir=/var/folders/x/T/run-1234",
+               "--remote-debugging-pipe", "--enable-automation", "playwright"],
+        ageHours: 5)]
+    let findings = IsolatedBrowserDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(findings[0].explanation.contains("Playwright"))
+}
+
+@Test func saysNothingAboutAToolItCannotIdentify() {
+    // Better to say less than to guess at where something came from.
+    let processes = [Fixtures.process(
+        pid: 9200, path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        args: ["Google Chrome", "--user-data-dir=/Users/x/scratch/profile"], ageHours: 5)]
+    let findings = IsolatedBrowserDetector().findings(
+        in: Fixtures.snapshot(processes: processes),
+        history: Fixtures.history(processes, cpuPercent: 0), settings: Settings())
+
+    #expect(!findings[0].explanation.contains("started it"))
 }
 
 @Test func aContainerCarriesTheCommandsYouWouldHaveTyped() {

@@ -45,7 +45,8 @@ public struct AndroidEmulatorDetector: Detector {
                         Android emulator: \(device)
                         \(group.count) processes, \(Formatting.memory(memory))
                         \(group.map { "pid \($0.pid) — \($0.executablePath)" }.joined(separator: "\n"))
-                        """)
+                        """,
+                    command: seed.arguments.joined(separator: " "))
             }
     }
 

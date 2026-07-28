@@ -34,7 +34,8 @@ public struct ContainerDetector: Detector {
 
                     docker logs \(container.name)
                     docker stop \(container.name)
-                    """)
+                    """,
+                command: "docker run … \(container.image)")
         }
         .sorted { $0.age > $1.age }
     }
