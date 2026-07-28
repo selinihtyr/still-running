@@ -21,12 +21,17 @@ public struct EngineResult: Sendable, Equatable {
     /// Informational only. Deliberately has no target, so the UI cannot offer
     /// to stop WindowServer.
     public let alsoHot: [HotProcess]
+    /// Things holding the machine awake that are named rather than offered up:
+    /// an app playing audio is worth knowing about and is nobody's business to
+    /// quit. The ones that are safe to stop are findings instead.
+    public let keepingAwake: [AwakeHolder]
 
-    public static let empty = EngineResult(findings: [], alsoHot: [])
+    public static let empty = EngineResult(findings: [], alsoHot: [], keepingAwake: [])
 
-    public init(findings: [Finding], alsoHot: [HotProcess]) {
+    public init(findings: [Finding], alsoHot: [HotProcess], keepingAwake: [AwakeHolder] = []) {
         self.findings = findings
         self.alsoHot = alsoHot
+        self.keepingAwake = keepingAwake
     }
 }
 
@@ -47,18 +52,31 @@ public struct DetectorEngine: Sendable {
 
     /// Order matters: the first detector to claim a pid owns it.
     public static var defaultDetectors: [any Detector] {
+        // AwakeDetector comes before OrphanDetector on purpose: a `caffeinate`
+        // whose terminal closed is an orphan, but "keeping this Mac awake" is
+        // the more specific thing to be told, and the only one that explains
+        // the battery.
         [TunnelDetector(), IsolatedBrowserDetector(), ContainerDetector(), SimulatorDetector(),
-         AndroidEmulatorDetector(), DevServerDetector(), OrphanDetector()]
+         AndroidEmulatorDetector(), DevServerDetector(), AwakeDetector(), OrphanDetector()]
     }
 
     public func evaluate(snapshot: Snapshot, history: History,
                          settings: Settings, excluded: Set<String>) -> EngineResult {
         var claimed = Set<Int32>()
         var findings: [Finding] = []
+        // Dismissed pids are remembered separately from claimed ones. They must
+        // not be claimed — another detector may still have something true to
+        // say about them — but "never list this again" has to mean it, and
+        // naming one in an informational list would move the row down the panel
+        // rather than take it away.
+        var dismissed = Set<Int32>()
 
         for detector in detectors {
             for finding in detector.findings(in: snapshot, history: history, settings: settings) {
-                guard !excluded.contains(finding.identity) else { continue }
+                guard !excluded.contains(finding.identity) else {
+                    if case .processes(let pids) = finding.target { dismissed.formUnion(pids) }
+                    continue
+                }
                 if case .processes(let pids) = finding.target {
                     guard claimed.isDisjoint(with: pids) else { continue }
                     claimed.formUnion(pids)
@@ -84,7 +102,12 @@ public struct DetectorEngine: Sendable {
             .sorted { $0.cpuPercent > $1.cpuPercent }
             .prefix(hotLimit)
 
-        return EngineResult(findings: findings, alsoHot: Array(hot))
+        // Anything already listed as a finding says so in its own row; naming
+        // it again below would read as two problems where there is one.
+        let awake = AwakeDetector.holders(in: snapshot, settings: settings)
+            .filter { !claimed.contains($0.pid) && !dismissed.contains($0.pid) }
+
+        return EngineResult(findings: findings, alsoHot: Array(hot), keepingAwake: awake)
     }
 
     /// "Busy, but yours" means exactly that: something of the user's own that

@@ -13,6 +13,11 @@ public struct Settings: Codable, Sendable, Equatable {
     /// against right now.
     public var activeCPUPercent: Double = 5
     public var activityWindow: TimeInterval = 600
+    /// How long something must have been holding this Mac awake before it is
+    /// worth a row. A video call holds one for as long as the call, and saying
+    /// so while you are on it is noise; half an hour is long enough that the
+    /// answer is usually "I did not know that was still running".
+    public var awakeMinimumHold: TimeInterval = 1800
     /// Opt-in. Nil means no notifications.
     public var notifyAfter: TimeInterval?
     /// One request a day to GitHub's public releases API. Off means the app
@@ -39,6 +44,7 @@ public struct Settings: Codable, Sendable, Equatable {
         idleMemoryBytes = value(.idleMemoryBytes, blank.idleMemoryBytes)
         activeCPUPercent = value(.activeCPUPercent, blank.activeCPUPercent)
         activityWindow = value(.activityWindow, blank.activityWindow)
+        awakeMinimumHold = value(.awakeMinimumHold, blank.awakeMinimumHold)
         notifyAfter = try? container.decodeIfPresent(TimeInterval.self, forKey: .notifyAfter)
         checksForUpdates = value(.checksForUpdates, blank.checksForUpdates)
     }

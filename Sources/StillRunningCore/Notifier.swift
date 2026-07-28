@@ -46,7 +46,12 @@ public struct Notifier: Sendable {
             notified.insert(finding.identity)
             presenter.present(
                 title: "Still running",
-                body: "\(finding.title) has been running for \(Formatting.duration(finding.age)).")
+                // A wake lock's age is how long it has been held, not how long
+                // the process has been up, so "running for" would be the wrong
+                // sentence about the right number.
+                body: finding.kind == .keepingAwake
+                    ? "\(finding.title), for \(Formatting.duration(finding.age))."
+                    : "\(finding.title) has been running for \(Formatting.duration(finding.age)).")
         }
     }
 

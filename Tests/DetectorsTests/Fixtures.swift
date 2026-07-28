@@ -74,9 +74,20 @@ enum Fixtures {
     }
 
     static func snapshot(processes: [ProcessSample], containers: [ContainerSample] = [],
-                         simulators: [SimulatorSample] = [], at: Date = now) -> Snapshot {
+                         simulators: [SimulatorSample] = [], at: Date = now,
+                         assertions: [PowerAssertionSample] = []) -> Snapshot {
         Snapshot(takenAt: at, processes: processes, containers: containers,
-                 simulators: simulators, currentUID: 501, ownPID: 999)
+                 simulators: simulators, currentUID: 501, ownPID: 999,
+                 assertions: assertions)
+    }
+
+    /// A promise that the machine will not sleep, as IOKit reports it.
+    static func assertion(pid: Int32, type: String = "PreventUserIdleSystemSleep",
+                          name: String = "caffeinate command-line tool",
+                          heldHours: Double = 3, timeoutSeconds: Int = 0) -> PowerAssertionSample {
+        PowerAssertionSample(pid: pid, type: type, name: name, processName: "held",
+                             startedAt: now.addingTimeInterval(-heldHours * 3600),
+                             timeoutSeconds: timeoutSeconds)
     }
 
     /// A history whose samples end at `now`, in which every process burned

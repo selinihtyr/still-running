@@ -2,6 +2,53 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.5.0] — 2026-07-29
+
+### It says what is keeping this Mac awake
+
+The battery is flat by morning, the fans ran inside a closed bag, and macOS
+will not tell you why. The answer is always a process holding a promise that
+the machine will not sleep — a `caffeinate` a script never released, a tab
+still playing audio, a video wake lock nobody took back — and the only place
+it is written down is a table of assertions nobody reads.
+
+They are named now, with the holder's own words for why: "Playing audio",
+"Video Wake Lock", "caffeinate command-line tool", and how long it has been
+going on. If everything else is quiet, the first line of the panel says it
+outright.
+
+**Only some of it is offered up.** A `caffeinate` nobody released is exactly a
+thing to stop, so it gets a row with a button. An app is named and left alone:
+quitting your browser because it is playing audio would be a worse bug than the
+one this exists to fix. Neither is anything launchd manages, because a button
+that stops something launchd starts again is a button that does nothing twice.
+
+Things that release themselves are never mentioned. Tools wrap commands in
+`caffeinate -t 300` by the dozen and not one of them is something anyone
+forgot. Nor is macOS talking to itself: `sharingd` holds one for Handoff and
+`powerd` holds one whenever the display is on, forever, and neither can be
+stopped by anyone.
+
+### The panel stopped doing its thinking on the main thread
+
+Working out what is running is about twenty milliseconds of matching across
+every process on the machine, and it was happening on the thread drawing the
+window, every five seconds the panel was open. It now happens off it. Along the
+way a snapshot learned to find a process by pid without searching the whole
+table, which is most of the cost of every rate the app calculates.
+
+### Fixed
+
+- Two processes started the same way — this machine had two `caffeinate`s at
+  once — could produce two rows carrying one identity, which is a list that
+  cannot be keyed and an exclusion that matches the wrong thing. They are one
+  row now, and stopping it stops both.
+- Dismissing a row with **Never list this again** could move it to the
+  informational list below instead of taking it away.
+- A refresh that took longer than the one after it could land its older answer
+  on top of the newer one. Stopping something starts its own refresh, so two
+  really are in flight whenever anyone clicks.
+
 ## [0.4.2] — 2026-07-29
 
 ### A night's sleep is not eight quiet hours

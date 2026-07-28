@@ -192,6 +192,97 @@ private var dockerIsRunning: Bool {
     #expect(measured < 30)
 }
 
+@Test func aRealCaffeinateIsReadOffTheRealAssertionTable() async {
+    // The whole feature rests on IOKit handing an unsigned, unprivileged app
+    // the system-wide assertion list. If that ever stops being true this test
+    // is the one that says so.
+    let held = Process()
+    held.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+    held.arguments = ["-i", "-t", "20"]     // times out on its own, so a crash here cannot leave the Mac awake
+    try? held.run()
+    defer { held.terminate() }
+    try? await Task.sleep(for: .seconds(1))
+
+    let assertions = LivePowerAssertions().assertions()
+    let mine = assertions.first { $0.pid == held.processIdentifier }
+
+    #expect(mine != nil)
+    #expect(mine?.preventsSleep == true)
+    // Created with -t, so the app must read it as something that releases
+    // itself rather than something anybody forgot.
+    #expect(mine?.expiresOnItsOwn == true)
+    print("read \(assertions.count) assertions; mine: \(mine?.type ?? "none") \"\(mine?.name ?? "")\"")
+}
+
+/// Stands in for the assertion table so a test never has to create a real
+/// promise with no timeout on it. A crashed test that left one behind would
+/// keep the machine awake all night, which is the exact bug this app is about.
+private struct StubAssertions: PowerAssertionSource {
+    let held: [PowerAssertionSample]
+    func assertions() -> [PowerAssertionSample] { held }
+}
+
+@Test func aForgottenPromiseBecomesARowWithAStopButton() async {
+    // Everything here is real except the assertion: a real process table, the
+    // real snapshot, the real engine, and a real pid to stop.
+    let tool = Process()
+    tool.executableURL = URL(fileURLWithPath: "/bin/sleep")
+    tool.arguments = ["30"]
+    try? tool.run()
+    defer { tool.terminate() }
+
+    let source = LiveSnapshotSource(power: StubAssertions(held: [
+        PowerAssertionSample(pid: tool.processIdentifier, type: "PreventUserIdleSystemSleep",
+                             name: "caffeinate command-line tool", processName: "sleep",
+                             startedAt: Date().addingTimeInterval(-4 * 3600)),
+    ]))
+    let snapshot = await source.sample()
+    var history = History()
+    history.record(snapshot)
+
+    let result = DetectorEngine().evaluate(snapshot: snapshot, history: history,
+                                           settings: Settings(), excluded: [])
+    let row = result.findings.first { $0.kind == .keepingAwake }
+
+    #expect(row != nil)
+    #expect(row?.target == .processes([tool.processIdentifier]))
+    #expect(row?.age ?? 0 >= 4 * 3600)
+    // A tool is safe to offer up, so it is a finding rather than a name in the
+    // list below.
+    #expect(!result.keepingAwake.contains { $0.pid == tool.processIdentifier })
+    print("row: \(row?.title ?? "none") — \(row?.detail ?? "")")
+}
+
+@Test func arealForgottenCaffeinateBecomesARealRow() async {
+    // No stubs anywhere in this one: a real assertion with no timeout on it, the
+    // real IOKit table, the real process list, the real engine. The shell
+    // wrapper kills it after eight seconds whatever happens here, so a test
+    // that dies badly still cannot be the thing that keeps the Mac awake.
+    let wrapper = Process()
+    wrapper.executableURL = URL(fileURLWithPath: "/bin/sh")
+    wrapper.arguments = ["-c", "caffeinate -i & CAF=$!; sleep 8; kill $CAF 2>/dev/null"]
+    try? wrapper.run()
+    defer { wrapper.terminate() }
+    try? await Task.sleep(for: .seconds(1))
+
+    let snapshot = await LiveSnapshotSource().sample()
+    var history = History()
+    history.record(snapshot)
+
+    // Everything real about it is real; only the patience is shortened, since
+    // waiting half an hour for the threshold is not a test.
+    var settings = Settings()
+    settings.awakeMinimumHold = 0
+
+    let result = DetectorEngine().evaluate(snapshot: snapshot, history: history,
+                                           settings: settings, excluded: [])
+    let row = result.findings.first { $0.kind == .keepingAwake && $0.title.hasPrefix("caffeinate") }
+
+    #expect(row != nil)
+    #expect(row?.detail.contains("caffeinate") == true)
+    print("live row: \(row?.title ?? "none") — \(row?.detail ?? "") — \(row?.explanation ?? "")")
+}
+
 @Test func liveSamplingStaysCheap() async {
     let source = LiveSnapshotSource()
     _ = await source.sample()   // warm the caches

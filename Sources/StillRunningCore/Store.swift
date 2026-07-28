@@ -38,6 +38,9 @@ public struct PendingStop: Sendable, Identifiable, Equatable {
 public final class Store {
     public private(set) var findings: [Finding] = []
     public private(set) var alsoHot: [HotProcess] = []
+    /// Named, not offered up: the things holding this Mac awake that are not
+    /// this app's business to quit.
+    public private(set) var keepingAwake: [AwakeHolder] = []
     /// Identities with a stop in flight. Stopping is per row, not global: a
     /// container that ignores SIGTERM keeps Docker waiting out its ten second
     /// grace period, and that must not freeze every other button.
@@ -79,6 +82,10 @@ public final class Store {
     private var latest: Snapshot?
     private var panelOpen = false
     private var samplingTask: Task<Void, Never>?
+    /// Counts samples so a refresh that took longer cannot land its answer on
+    /// top of a newer one. Stopping something triggers its own refresh, so two
+    /// are genuinely in flight at once whenever anyone clicks.
+    private var generation = 0
 
     /// Five seconds while the user is looking, a minute while they are not.
     public var currentInterval: TimeInterval { panelOpen ? 5 : 60 }
@@ -225,15 +232,31 @@ public final class Store {
         isRefreshing = true
         defer { isRefreshing = false }
         let snapshot = await source.sample()
+        generation += 1
+        let mine = generation
         latest = snapshot
         lastSampledAt = snapshot.takenAt
         thermal = .current
         history.record(snapshot)
 
-        let result = engine.evaluate(snapshot: snapshot, history: history,
-                                     settings: settings, excluded: exclusions.identities)
+        // Detection is twenty milliseconds of string matching across every
+        // process on the machine, and this method runs on the main actor every
+        // five seconds while the panel is open. Nothing about it needs to be
+        // there: every input is a value type and the result is Sendable, so it
+        // runs off the main thread and only the assignments come back.
+        let engine = self.engine
+        let excluded = exclusions.identities
+        let current = settings
+        let recorded = history
+        let result = await Task.detached(priority: .userInitiated) {
+            engine.evaluate(snapshot: snapshot, history: recorded,
+                            settings: current, excluded: excluded)
+        }.value
+
+        guard mine == generation else { return }
         findings = result.findings
         alsoHot = result.alsoHot
+        keepingAwake = result.keepingAwake
         // A finding that vanished cannot still be forceable.
         forceableIdentities.formIntersection(Set(findings.map(\.identity)))
         notifier.consider(findings, settings: settings)

@@ -12,15 +12,18 @@ public struct LiveSnapshotSource: SnapshotSource {
     private let docker: DockerClient?
     private let simulators: any SimulatorControl
     private let launchd: any LaunchdJobSource
+    private let power: any PowerAssertionSource
 
     public init(processes: LiveProcessSource = LiveProcessSource(),
                 docker: DockerClient? = DockerClient.discover(),
                 simulators: any SimulatorControl = SimctlSource(),
-                launchd: any LaunchdJobSource = LaunchctlJobs()) {
+                launchd: any LaunchdJobSource = LaunchctlJobs(),
+                power: any PowerAssertionSource = LivePowerAssertions()) {
         self.processes = processes
         self.docker = docker
         self.simulators = simulators
         self.launchd = launchd
+        self.power = power
     }
 
     public func sample() async -> Snapshot {
@@ -39,7 +42,8 @@ public struct LiveSnapshotSource: SnapshotSource {
             // Uptime excludes sleep, which is what makes it the right divisor
             // for a rate. This machine had been up eleven hours and awake for
             // under seven of them when that mattered.
-            awakeUptime: ProcessInfo.processInfo.systemUptime
+            awakeUptime: ProcessInfo.processInfo.systemUptime,
+            assertions: power.assertions()
         )
     }
 

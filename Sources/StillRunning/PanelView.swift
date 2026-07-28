@@ -29,6 +29,7 @@ struct PanelView: View {
             }
 
             undoStrip
+            AwakeSection(holders: store.keepingAwake)
             AlsoHotSection(processes: store.alsoHot)
             updateStrip
 
@@ -90,6 +91,13 @@ struct PanelView: View {
 
     private var subhead: String {
         if store.findings.isEmpty {
+            // Someone who opened this because the machine never slept should be
+            // answered in the first line they read, not the last.
+            if !store.keepingAwake.isEmpty {
+                return store.keepingAwake.count == 1
+                    ? "\(store.keepingAwake[0].name) is keeping this Mac awake."
+                    : "\(store.keepingAwake.count) things are keeping this Mac awake."
+            }
             return "Everything alive was started recently or is doing work."
         }
         let memory = store.findings.reduce(UInt64(0)) { $0 + $1.memoryBytes }

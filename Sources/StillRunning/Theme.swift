@@ -20,6 +20,7 @@ enum Theme {
         case .isolatedBrowser: Color(red: 0.20, green: 0.56, blue: 0.95) // blue
         case .orphan: Color(red: 0.83, green: 0.56, blue: 0.18)          // ochre
         case .tunnel: Color(red: 0.86, green: 0.31, blue: 0.34)           // red: an open door
+        case .keepingAwake: Color(red: 0.55, green: 0.42, blue: 0.90)     // violet: a lit screen at night
         }
     }
 
@@ -37,6 +38,7 @@ enum Theme {
         case .devServer: "terminal.fill"
         case .orphan: "circle.dashed"
         case .tunnel: "point.3.connected.trianglepath.dotted"
+        case .keepingAwake: "eye.fill"
         }
     }
 

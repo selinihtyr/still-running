@@ -48,6 +48,7 @@ Activity Monitor answers **what is using CPU right now**. Still Running answers
 | **Dev servers** | node, bun, deno, vite, next, webpack, metro, astro, uvicorn, gradle daemons, watchman |
 | **Tunnels** | cloudflared, ngrok and friends, with what they're publishing |
 | **Orphans** | Reparented to launchd with no controlling terminal — and not a service launchd manages on purpose |
+| **Whatever is keeping the Mac awake** | Power assertions that never expire, held by something of yours: a `caffeinate` nobody released, a tab still playing audio |
 
 ### Every row explains itself
 
@@ -202,6 +203,16 @@ stops them behind a safety guard that no other code path can bypass.
 Because a snapshot is just data, every rule is tested against recorded fixtures
 of real machine states — including the one where the user's own Chrome must not
 be flagged while an automation Chrome beside it must be.
+
+**Not everything it finds is something it offers to stop.** A process holding
+this Mac awake gets a row with a button when it is a command line tool, because
+a `caffeinate` nobody released is exactly a thing to end. An app gets its name
+printed and nothing else: quitting a browser because it is playing audio would
+be a worse bug than the one the row exists to fix. Anything launchd manages is
+named too, and never offered, because launchd starts it again. macOS holding
+its own assertions — `sharingd` for Handoff, `powerd` whenever the display is
+on — is left out entirely, and so is anything created with a timeout, since a
+`caffeinate -t 300` releases itself and was nobody's mistake.
 
 **A percentage is per second of running time.** This laptop had been up for
 eleven hours and awake for under seven of them, and nothing burns CPU with the

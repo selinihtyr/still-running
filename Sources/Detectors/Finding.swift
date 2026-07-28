@@ -1,10 +1,11 @@
 import Foundation
 
 public enum FindingKind: String, Sendable, Codable, CaseIterable {
-    case isolatedBrowser, container, simulator, devServer, orphan, tunnel
+    case isolatedBrowser, container, simulator, devServer, orphan, tunnel, keepingAwake
 
     public var label: String {
         switch self {
+        case .keepingAwake: "Keeping this Mac awake"
         case .isolatedBrowser: "Automation browser"
         case .container: "Container"
         case .simulator: "Simulator"
@@ -18,6 +19,8 @@ public enum FindingKind: String, Sendable, Codable, CaseIterable {
     /// a container name is an identifier, not an explanation.
     public var plainDescription: String {
         switch self {
+        case .keepingAwake:
+            "A process holding this Mac awake. macOS will not idle-sleep while a promise like this is out, which is how a laptop spends a night awake in a closed bag."
         case .isolatedBrowser:
             "A browser running on its own throwaway profile — started by a script or a tool, not by you. None of your tabs are in it."
         case .container:
