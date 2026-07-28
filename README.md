@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing a dev server, an automation browser, and five containers, each with how long it has been running">
+  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing an automation browser burning 80% of a core and an orphaned process, each with how long it has been running">
 </p>
 
 <p align="center">
@@ -49,10 +49,18 @@ Activity Monitor answers **what is using CPU right now**. Still Running answers
 | **Tunnels** | cloudflared, ngrok and friends, with what they're publishing |
 | **Orphans** | Reparented to launchd with no controlling terminal — and not a service launchd manages on purpose |
 
-Every row says what it is if you rest on it, because a profile path or a
-container name is an identifier rather than an explanation. The **⋯** menu
-takes you to it in Finder where there is somewhere to go, and copies the pids,
-paths and commands where there isn't.
+### Every row explains itself
+
+<p align="center">
+  <img src="docs/images/row-expanded.png" width="420" alt="A row opened to show what the thing is in plain words, the command that started it, and a link to its folder">
+</p>
+
+Click a row and it opens. A profile path is an identifier, not an explanation,
+so it says what the thing actually is, shows the command that started it, and
+links to where it lives. Where the path or the command names a tool it knows —
+Claude Code, Playwright, Puppeteer, Selenium, Cypress, ChromeDriver — it says
+which one started the browser, and stays quiet rather than guessing when it
+cannot tell.
 
 Something appears only once it also crosses a threshold: older than two hours,
 or orphaned, or above 25% CPU sustained for three minutes, or idle for half an
