@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or newer">
+  <img src="https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white" alt="macOS 14 or newer">
   <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
@@ -139,7 +139,11 @@ account and this is a free thing I wrote for myself. Building it yourself is
 better anyway: Gatekeeper never gets an opinion, and you can read every line
 that ends up running on your machine.
 
-Requires macOS 26 and Xcode 26.
+Requires macOS 14 or newer, and Xcode 16 or newer to build it.
+
+It is developed and used daily on macOS 26. It builds and its tests pass for
+macOS 14, but nobody has run it there yet — if something looks wrong on an
+older version, [open an issue](../../issues), that is genuinely useful.
 
 To update, `git pull && ./scripts/install.sh`. To uninstall, quit it from the
 panel and delete `/Applications/Still Running.app`.

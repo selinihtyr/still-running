@@ -2,6 +2,22 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.3.0] — 2026-07-28
+
+### It runs on macOS 14 instead of macOS 26
+
+The floor was macOS 26 for one reason: a single `Mutex` from the Synchronization
+framework, which needs macOS 15. Swapping it for a lock and a box moved the
+requirement down two whole releases — from a version released weeks ago to one
+from 2023. Building it now needs Xcode 16 rather than Xcode 26 as well.
+
+Nothing else in the app needed anything newer. It was excluding almost everyone
+by accident.
+
+It is developed and used daily on macOS 26, and it builds with its tests passing
+for macOS 14, but nobody has run it there yet. If something looks wrong on an
+older version, please open an issue.
+
 ## [0.2.0] — 2026-07-28
 
 ### Rows explain themselves

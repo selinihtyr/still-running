@@ -1,12 +1,12 @@
 import Testing
 import Foundation
-import Synchronization
+import ProcessKit
 @testable import StillRunningCore
 import Detectors
 
 final class RecordingPresenter: NotificationPresenting, Sendable {
-    private let storage = Mutex<[String]>([])
-    private let authorizationRequests = Mutex<Int>(0)
+    private let storage = Locked<[String]>([])
+    private let authorizationRequests = Locked<Int>(0)
 
     var messages: [String] { storage.withLock { $0 } }
     var timesAsked: Int { authorizationRequests.withLock { $0 } }

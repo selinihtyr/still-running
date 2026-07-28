@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 import Darwin
-import Synchronization
 @testable import Actions
 import Detectors
 import ProcessKit
@@ -12,7 +11,7 @@ private struct SentSignal: Sendable, Equatable {
 }
 
 private final class RecordingSignaller: ProcessSignalling, Sendable {
-    private let storage = Mutex<[SentSignal]>([])
+    private let storage = Locked<[SentSignal]>([])
     private let alive: Bool
 
     init(aliveAfterSignal: Bool = false) { self.alive = aliveAfterSignal }
@@ -25,13 +24,13 @@ private final class RecordingSignaller: ProcessSignalling, Sendable {
 }
 
 private final class RecordingContainers: ContainerStopping, Sendable {
-    private let storage = Mutex<[String]>([])
+    private let storage = Locked<[String]>([])
     var stopped: [String] { storage.withLock { $0 } }
     func stop(id: String) async throws { storage.withLock { $0.append(id) } }
 }
 
 private final class RecordingSimulators: SimulatorStopping, Sendable {
-    private let storage = Mutex<[String]>([])
+    private let storage = Locked<[String]>([])
     var shutdown: [String] { storage.withLock { $0 } }
     func shutdown(udid: String) async throws { storage.withLock { $0.append(udid) } }
 }

@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import Synchronization
 @testable import StillRunningCore
 import Actions
 import Detectors
@@ -9,7 +8,7 @@ import ProcessKit
 /// Replays a fixed list of snapshots, holding the last one once exhausted.
 private final class ScriptedSource: SnapshotSource {
     let snapshots: [Snapshot]
-    private let cursor = Mutex<Int>(0)
+    private let cursor = Locked<Int>(0)
 
     init(snapshots: [Snapshot]) { self.snapshots = snapshots }
 
@@ -25,8 +24,8 @@ private final class ScriptedSource: SnapshotSource {
 }
 
 private final class SpyStopper: Stopping, Sendable {
-    private let calls = Mutex<(stopped: [String], forced: [String])>((stopped: [], forced: []))
-    private let concurrency = Mutex<(current: Int, peak: Int)>((current: 0, peak: 0))
+    private let calls = Locked<(stopped: [String], forced: [String])>((stopped: [], forced: []))
+    private let concurrency = Locked<(current: Int, peak: Int)>((current: 0, peak: 0))
     private let plannedOutcome: StopOutcome
     private let delay: Duration
 
@@ -69,7 +68,7 @@ private func automationSnapshots(cpuPercent: Double = 60) -> [Snapshot] {
 }
 
 private final class SpyRestarter: Restarting, Sendable {
-    private let calls = Mutex<[String]>([])
+    private let calls = Locked<[String]>([])
     private let succeeds: Bool
 
     init(succeeds: Bool = true) { self.succeeds = succeeds }

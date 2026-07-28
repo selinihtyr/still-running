@@ -1,9 +1,9 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
     name: "StillRunning",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v14)],
     products: [
         .executable(name: "StillRunning", targets: ["StillRunning"])
     ],

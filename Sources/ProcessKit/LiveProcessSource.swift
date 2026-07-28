@@ -1,6 +1,5 @@
 import Darwin
 import Foundation
-import Synchronization
 
 public protocol SnapshotSource: Sendable {
     func sample() async -> Snapshot
@@ -20,7 +19,7 @@ public final class LiveProcessSource: Sendable {
         let arguments: [String]
     }
 
-    private let cache = Mutex<[Int32: Cached]>([:])
+    private let cache = Locked<[Int32: Cached]>([:])
 
     public init() {}
 
