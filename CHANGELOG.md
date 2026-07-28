@@ -14,6 +14,15 @@ newest one — and turns blue when a newer release is waiting.
 The answer is also remembered between launches, so quitting and reopening no
 longer forgets that an update exists until the next day's check comes round.
 
+### Fixed
+
+- `node -e "…"` was titled with its own source code, so a one-line server read
+  as `node · require('http').createServer((q,s)=>s.end('ok')).listen(4599);`.
+  There is no script file to name in that case, so it is just `node` now.
+- The live test suite failed rather than skipped when no container runtime was
+  running. A red test for a daemon you have chosen not to run reads as a broken
+  app.
+
 ## [0.4.0] — 2026-07-28
 
 ### It survives a restart

@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing an automation browser burning 80% of a core and an orphaned process, each with how long it has been running">
+  <img src="docs/images/panel.png" width="420" alt="The Still Running panel, listing an automation browser, a stray node process and two containers, each with how long it has been running and a button to stop it">
 </p>
 
 <p align="center">
@@ -137,10 +137,17 @@ switched off for the app — which macOS keeps as a separate switch.
 for hours is worthless if a restart is the end of it. It is one login item and
 the switch turns it off.
 
-**Check for updates** asks GitHub once a day whether a newer release exists. If
-one does, the panel says so, and **Update** opens a Terminal window running the
+**Check for updates** asks GitHub once a day whether a newer release exists.
+
+<p align="center">
+  <img src="docs/images/update.png" width="420" alt="The panel showing that a newer version is out, with an Update button beside it">
+</p>
+
+If one is, the panel says so, and **Update** opens a Terminal window running the
 same `git pull` and `./scripts/install.sh` from the Install section — where you
-can watch the build and see it fail. Nothing is installed silently.
+can watch the build and see it fail. Nothing is installed silently, and if the
+checkout it was built from has moved, it opens the release page instead of
+running an installer from a path that may no longer hold one.
 
 ## Install
 
@@ -171,7 +178,7 @@ panel and delete `/Applications/Still Running.app`.
 ## Working on it
 
 ```bash
-swift test           # 200 tests, no network, nothing touched
+swift test           # 207 tests, no network, nothing touched
 ./scripts/bundle.sh  # produces build/Still Running.app without installing it
 ```
 

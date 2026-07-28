@@ -106,7 +106,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 560)
+        .frame(width: 440, height: 520)
         .onAppear { loginItem = LoginItem.state }
         .onChange(of: store.settings.notifyAfter) { _, new in
             if new != nil { Notifier.requestAuthorization() }

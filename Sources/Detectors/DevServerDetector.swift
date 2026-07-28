@@ -97,8 +97,16 @@ public struct DevServerDetector: Detector {
             return rest.map { "\(command) \($0)" } ?? command
         }
         guard knownExecutables.contains(process.name) else { return nil }
-        guard let script = tokens.first(where: { !$0.hasPrefix("-") }) else { return process.name }
+        guard let script = tokens.first(where: { !$0.hasPrefix("-") }),
+              looksLikeAScript(script)
+        else { return process.name }
         return "\(process.name) · \(script)"
+    }
+
+    /// `node -e "…"` has no script file, so the first non-flag token is source
+    /// code. Pasting it into the row gives a title nobody can read.
+    private static func looksLikeAScript(_ token: String) -> Bool {
+        token.rangeOfCharacter(from: CharacterSet(charactersIn: "()=;{}'\"`&|<>")) == nil
     }
 
     static func explain(group: [ProcessSample], label: String, window: TimeInterval) -> String {

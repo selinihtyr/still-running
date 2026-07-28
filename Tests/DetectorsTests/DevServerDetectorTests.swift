@@ -91,3 +91,20 @@ import ProcessKit
 
     #expect(a[0].identity == b[0].identity)
 }
+
+@Test func doesNotPutInlineCodeInTheTitle() {
+    // `node -e "…"` has no script file, and pasting the source into the row
+    // gives a title like `node · require('http').createServer((q,s)=>…`.
+    let inline = Fixtures.process(
+        pid: 4800, path: "/opt/homebrew/bin/node",
+        args: ["node", "-e", "require('http').createServer((q,s)=>s.end('ok')).listen(4599);"],
+        ageHours: 3)
+
+    #expect(DevServerDetector.label(for: inline) == "node")
+}
+
+@Test func stillNamesTheScriptWhenThereIsOne() {
+    let scripted = Fixtures.process(pid: 4801, path: "/opt/homebrew/bin/node",
+                                    args: ["node", "server.js"], ageHours: 3)
+    #expect(DevServerDetector.label(for: scripted) == "node · server.js")
+}
