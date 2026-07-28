@@ -276,14 +276,12 @@ struct PanelView: View {
                     .foregroundStyle(.orange)
                     .lineLimit(2)
             } else {
-                // A live counter is the cheapest possible proof that the app is
-                // still watching, and that pressing refresh did something.
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(checkedLabel(at: context.date))
-                        .font(.rowDetail)
-                        .foregroundStyle(.tertiary)
-                        .contentTransition(.numericText())
-                }
+                // The time of the last check, not a second hand. A number that
+                // climbs forever draws the eye to the one thing on the panel
+                // that never means anything.
+                Text(checkedLabel)
+                    .font(.rowDetail)
+                    .foregroundStyle(checkedTint)
             }
             Spacer(minLength: 0)
             // Fixed frames, and no spinning: a sample takes about a tenth of a
@@ -321,10 +319,22 @@ struct PanelView: View {
         .padding(.vertical, 9)
     }
 
-    private func checkedLabel(at now: Date) -> String {
+    /// The version, not a second hand. A number that climbs forever draws the
+    /// eye to the one thing on the panel that never means anything; which
+    /// version you are on is worth the same space.
+    private var checkedLabel: String {
         if store.isRefreshing { return "Checking…" }
-        guard let checked = store.lastSampledAt else { return "Checking…" }
-        let seconds = max(0, Int(now.timeIntervalSince(checked)))
-        return seconds < 1 ? "Checked just now" : "Checked \(seconds)s ago"
+        switch store.update {
+        case .available(let found): return "Version \(found.version) is ready to install"
+        case .upToDate: return "Up to date · \(Store.version)"
+        case .unknown:
+            guard let checked = store.lastSampledAt else { return "Checking…" }
+            return "Checked at " + checked.formatted(date: .omitted, time: .shortened)
+        }
+    }
+
+    private var checkedTint: AnyShapeStyle {
+        if case .available = store.update, !store.isRefreshing { return AnyShapeStyle(.blue) }
+        return AnyShapeStyle(.tertiary)
     }
 }

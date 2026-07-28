@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import ProcessKit
 @testable import StillRunningCore
 
 private func release(tag: String, url: String = "https://example.com/r") -> Data {
@@ -137,4 +138,73 @@ func readsTheRealReleaseFromGitHub() async {
     }
     print("live: latest release is \(found.version) at \(found.pageURL)")
     #expect(found.pageURL.absoluteString.contains("still-running"))
+}
+
+// MARK: - Remembering the answer across a relaunch
+
+/// The update strip does not care what is on the machine, so one empty
+/// snapshot is enough for these.
+private final class EmptySource: SnapshotSource {
+    func sample() async -> Snapshot {
+        Snapshot(takenAt: Date(), processes: [], containers: [], simulators: [],
+                 currentUID: 501, ownPID: 1)
+    }
+}
+
+@MainActor
+@Test func remembersTheLastAnswerSoARelaunchIsNotBlank() async {
+    let defaults = UserDefaults(suiteName: "remembers-\(UUID().uuidString)")!
+    defaults.set("9.9.9", forKey: "lastKnownRelease")
+    defaults.set("https://example.com/r", forKey: "lastKnownReleasePage")
+    // Checked minutes ago, so no request goes out — only the remembered answer.
+    defaults.set(Date(), forKey: "lastUpdateCheck")
+
+    let store = Store(source: EmptySource(), defaults: defaults)
+    await store.checkForUpdate()
+
+    guard case .available(let found) = store.update else {
+        Issue.record("expected the remembered release, got \(store.update)")
+        return
+    }
+    #expect(found.version == ReleaseVersion("9.9.9")!)
+}
+
+@MainActor
+@Test func stopsOfferingAReleaseOnceYouAreRunningIt() async {
+    let defaults = UserDefaults(suiteName: "installed-\(UUID().uuidString)")!
+    defaults.set("0.0.0", forKey: "lastKnownRelease")
+    defaults.set(Date(), forKey: "lastUpdateCheck")
+
+    let store = Store(source: EmptySource(), defaults: defaults)
+    await store.checkForUpdate()
+
+    #expect(store.update == .upToDate)
+}
+
+@MainActor
+@Test func saysNothingAboutVersionsWhenTheCheckIsSwitchedOff() async {
+    let defaults = UserDefaults(suiteName: "off-\(UUID().uuidString)")!
+    defaults.set("9.9.9", forKey: "lastKnownRelease")
+
+    let store = Store(source: EmptySource(), defaults: defaults)
+    store.settings.checksForUpdates = false
+    await store.checkForUpdate()
+
+    #expect(store.update == .unknown)
+}
+
+@MainActor
+@Test func asksOnceOnTheDayItIsInstalledRatherThanWaitingOutTheThrottle() async {
+    let defaults = UserDefaults(suiteName: "first-day-\(UUID().uuidString)")!
+    // Checked a moment ago, but no answer was ever kept — the state an upgrade
+    // from a version that had no update check leaves behind.
+    defaults.set(Date(), forKey: "lastUpdateCheck")
+
+    let store = Store(source: EmptySource(), defaults: defaults,
+                      updateChecker: UpdateChecker(currentVersion: "0.1.0",
+                                                   fetch: { _ in release(tag: "v9.9.9") }))
+    await store.checkForUpdate()
+
+    // It asked, rather than staying silent about versions for a day.
+    #expect(store.update != .unknown)
 }

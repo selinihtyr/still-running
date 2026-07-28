@@ -2,6 +2,18 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.4.1] — 2026-07-28
+
+### The footer says something worth reading
+
+It used to count seconds since the last check, forever. A number that climbs
+and never means anything, in the one line of the panel that could be telling
+you something. It now says which version you are on and whether that is the
+newest one — and turns blue when a newer release is waiting.
+
+The answer is also remembered between launches, so quitting and reopening no
+longer forgets that an update exists until the next day's check comes round.
+
 ## [0.4.0] — 2026-07-28
 
 ### It survives a restart

@@ -74,6 +74,7 @@ public final class Store {
     private let defaults: UserDefaults
     private var exclusions: Exclusions
     private var notifier: Notifier
+    private let updateChecker: UpdateChecker
     private var history = History()
     private var latest: Snapshot?
     private var panelOpen = false
@@ -91,6 +92,9 @@ public final class Store {
     /// How hard the machine is being pushed right now, refreshed with each sample.
     public private(set) var thermal: Thermal = .current
 
+    /// The version this build is, for the panel's footer.
+    public static let version = UpdateChecker.bundledVersion
+
     /// Whether a newer release exists. `.unknown` until the first answer comes
     /// back, and the panel shows nothing at all until it is `.available`.
     public private(set) var update: UpdateStatus = .unknown
@@ -103,6 +107,7 @@ public final class Store {
                 restarter: any Restarting = RestartCoordinator(),
                 defaults: UserDefaults = .standard,
                 notifier: Notifier = Notifier(),
+                updateChecker: UpdateChecker = UpdateChecker(),
                 cancellationWindow: TimeInterval = 3,
                 undoWindow: TimeInterval = 120) {
         let settingsStore = SettingsStore(defaults: defaults)
@@ -113,6 +118,7 @@ public final class Store {
         self.defaults = defaults
         self.exclusions = Exclusions(defaults: defaults)
         self.notifier = notifier
+        self.updateChecker = updateChecker
         self.cancellationWindow = cancellationWindow
         self.undoWindow = undoWindow
         self.settings = settingsStore.settings
@@ -154,15 +160,50 @@ public final class Store {
             update = .unknown
             return
         }
+        // The last answer, held against this build's version. Without it a
+        // relaunch inside the daily window would know nothing at all, and the
+        // panel would go back to saying nothing until tomorrow.
+        applyRememberedRelease()
+
+        // The daily throttle only makes sense once there is an answer to hold
+        // on to. Having never had one, waiting out the day would leave the
+        // panel saying nothing about versions on the day it was installed.
+        let neverAnswered = defaults.string(forKey: Self.rememberedReleaseKey) == nil
         let last = defaults.object(forKey: key) as? Date
-        guard force || UpdateChecker.isDue(lastChecked: last, now: .now, every: 86_400) else { return }
+        guard force || neverAnswered
+                || UpdateChecker.isDue(lastChecked: last, now: .now, every: 86_400) else { return }
 
         isCheckingForUpdate = true
         defer { isCheckingForUpdate = false }
-        let result = await UpdateChecker().check()
+        let result = await updateChecker.check()
         // A failed check must not park the next one a day away.
         if result != .unknown { defaults.set(Date(), forKey: key) }
+        if case .available(let found) = result {
+            defaults.set(found.version.description, forKey: Self.rememberedReleaseKey)
+            defaults.set(found.pageURL.absoluteString, forKey: Self.rememberedPageKey)
+        } else if result == .upToDate {
+            defaults.set(Store.version, forKey: Self.rememberedReleaseKey)
+        }
         update = result
+    }
+
+    private static let rememberedReleaseKey = "lastKnownRelease"
+    private static let rememberedPageKey = "lastKnownReleasePage"
+
+    /// Compares the newest release we have ever heard of against this build.
+    /// Updating makes it match, which is exactly when the strip should go away.
+    private func applyRememberedRelease() {
+        guard let remembered = defaults.string(forKey: Self.rememberedReleaseKey),
+              let latest = ReleaseVersion(remembered),
+              let running = ReleaseVersion(Store.version)
+        else { return }
+
+        if latest > running,
+           let page = URL(string: defaults.string(forKey: Self.rememberedPageKey) ?? "") {
+            update = .available(AvailableUpdate(version: latest, pageURL: page))
+        } else {
+            update = .upToDate
+        }
     }
 
     /// Runs the pull and the installer in a Terminal window, or opens the
