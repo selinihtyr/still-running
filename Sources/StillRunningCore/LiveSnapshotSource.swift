@@ -35,7 +35,11 @@ public struct LiveSnapshotSource: SnapshotSource {
             simulators: devices,
             currentUID: getuid(),
             ownPID: ProcessInfo.processInfo.processIdentifier,
-            managedPIDs: launchd.managedPIDs()
+            managedPIDs: launchd.managedPIDs(),
+            // Uptime excludes sleep, which is what makes it the right divisor
+            // for a rate. This machine had been up eleven hours and awake for
+            // under seven of them when that mattered.
+            awakeUptime: ProcessInfo.processInfo.systemUptime
         )
     }
 

@@ -2,6 +2,36 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.4.2] — 2026-07-29
+
+### A night's sleep is not eight quiet hours
+
+A percentage measured across a sleeping laptop is not a percentage. Rates were
+divided by time on the wall, and this machine spent four of its last eleven
+hours asleep — so anything left running overnight had its CPU divided by the
+nap and read as a few percent by morning. Worse, the rule that decides
+something has been busy for a while looks for the quietest stretch it can find,
+and the nap was always the quietest: on the one night it mattered, the app had
+nothing to say. Which is the whole job.
+
+Sleep counted as idle time, too. Shut the lid for eight hours and every large
+process woke up looking abandoned — a false alarm delivered at exactly the
+moment you are deciding whether to trust any of this.
+
+Rates, and the windows they are measured over, now run on the time the machine
+was actually awake. An age still runs on the wall clock, because you did start
+it five hours ago.
+
+### Opening the panel no longer catches a process mid-blink
+
+Opening the panel takes a sample straight away, and that one can land a
+fraction of a second after the sample the timer just took. Whatever a process
+happened to be doing in that fraction became the percentage on the row — and a
+browser, whose helpers are counted as one thing, reads in the hundreds that
+way. Measured here: a busy loop read 98% across a six-hundred-millisecond gap
+and 10% measured properly. A gap too short to mean anything is now widened
+until it means something.
+
 ## [0.4.1] — 2026-07-28
 
 ### The footer says something worth reading

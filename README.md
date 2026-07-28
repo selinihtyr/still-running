@@ -203,6 +203,19 @@ Because a snapshot is just data, every rule is tested against recorded fixtures
 of real machine states — including the one where the user's own Chrome must not
 be flagged while an automation Chrome beside it must be.
 
+**A percentage is per second of running time.** This laptop had been up for
+eleven hours and awake for under seven of them, and nothing burns CPU with the
+lid shut. Dividing by the nap turns something pinning three cores into three
+percent, and counting the nap as quiet time makes every large process look
+abandoned by morning — so rates and the windows they are measured over run on
+uptime, which excludes sleep, while an age runs on the wall clock, because you
+did start it five hours ago. A rate is also never read from a gap too short to
+mean anything: opening the panel takes a sample immediately, and the fraction
+of a second since the last one describes an instant rather than a process. On
+this machine a busy loop read 98% from a 0.6 second gap and 10% measured
+properly, which for a browser's helpers counted together is the difference
+between a calm row and a three-figure one.
+
 **It stays out of the way.** A sample costs about 115 ms and runs every five
 seconds while the panel is open, once a minute while it is closed. Getting
 there took work: reading every process's arguments meant a megabyte-sized

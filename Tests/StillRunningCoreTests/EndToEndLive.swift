@@ -150,6 +150,48 @@ private var dockerIsRunning: Bool {
     #expect(measured ?? 0 > 50)
 }
 
+@Test func openingThePanelDoesNotReadABurstAsASteadyRate() async {
+    // The regression this guards: opening the panel samples immediately, which
+    // can land a fraction of a second after the background timer's own sample.
+    // A process that happens to be busy in that fraction used to fill the row
+    // the user is looking at with a number describing an instant — and a group
+    // like a browser's, whose helpers are counted together, reads in the
+    // hundreds that way.
+    let burner = Process()
+    burner.executableURL = URL(fileURLWithPath: "/bin/sh")
+    // Idle first, so the long gap has nothing in it, then pins a core.
+    burner.arguments = ["-c", "sleep 8; while :; do :; done"]
+    let launched = Date()
+    try? burner.run()
+    defer { burner.terminate() }
+
+    let source = LiveProcessSource()
+    var history = History()
+    func sample() {
+        history.record(Snapshot(takenAt: Date(), processes: source.processes(), containers: [],
+                                simulators: [], currentUID: getuid(), ownPID: 0,
+                                awakeUptime: ProcessInfo.processInfo.systemUptime))
+    }
+    func sleep(until seconds: TimeInterval) async {
+        let remaining = seconds - Date().timeIntervalSince(launched)
+        if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
+    }
+
+    await sleep(until: 0.3);  sample()   // the timer's sample, burner idle
+    await sleep(until: 8.3);  sample()   // the next one, still idle: it just woke
+    await sleep(until: 8.9);  sample()   // opening the panel, mid-burst
+
+    let pid = burner.processIdentifier
+    // `measuredOver: 0` is the old behaviour: whatever the newest gap happens
+    // to be, here six hundred milliseconds of a pinned core.
+    let fromTheGap = history.cpuPercent(pid: pid, measuredOver: 0) ?? 0
+    let measured = history.cpuPercent(pid: pid) ?? 0
+    print("burst read from a 0.6s gap: \(Int(fromTheGap))%, measured over five seconds: \(Int(measured))%")
+
+    #expect(fromTheGap > 70)
+    #expect(measured < 30)
+}
+
 @Test func liveSamplingStaysCheap() async {
     let source = LiveSnapshotSource()
     _ = await source.sample()   // warm the caches
