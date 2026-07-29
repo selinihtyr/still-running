@@ -4,17 +4,31 @@ import StillRunningCore
 
 /// SwiftUI has no modifier for a window's collection behaviour, so the only way
 /// to the setting that stops Settings dragging you to another Space is the
-/// AppKit window behind the scene. The window is not attached yet while the
-/// view is being made, which is why this waits for the next pass.
-private struct SpaceFollower: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
+/// AppKit window behind the scene.
+///
+/// Timing is the whole difficulty. Ordering the window front is what makes
+/// macOS change Space, so a behaviour applied after that has arrived too late
+/// to prevent anything — which is exactly what a `DispatchQueue.main.async`
+/// from `updateNSView` does. `viewDidMoveToWindow` is the earliest hook there
+/// is: it fires as the view is attached, while the window is still being set
+/// up and before it is shown.
+private final class SpaceFollowingView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        WindowBehaviour.followTheActiveSpace(window)
+    }
+}
 
+private struct SpaceFollower: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { SpaceFollowingView(frame: .zero) }
+
+    /// Reapplied on later passes too: the window can be torn down and rebuilt
+    /// while the scene stays, and a behaviour set on a dead window helps nobody.
     func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.collectionBehavior =
-                WindowBehaviour.followingTheActiveSpace(from: window.collectionBehavior)
-        }
+        guard let window = view.window else { return }
+        window.collectionBehavior =
+            WindowBehaviour.followingTheActiveSpace(from: window.collectionBehavior)
     }
 }
 
@@ -58,6 +72,16 @@ struct SettingsView: View {
             }
             Picker("Notify me", selection: notifyBinding) {
                 ForEach(notifyChoices, id: \.label) { Text($0.label).tag($0.value) }
+            }
+            // A setting that reads "notify me" while macOS shows nothing is off
+            // and claiming to be on. That is worth saying louder than the rest.
+            if store.notificationsSilenced {
+                Text("macOS is not showing notifications for Still Running, so "
+                     + "this setting currently does nothing. Turn them on in "
+                     + "System Settings › Notifications › Still Running.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             // The one case where the chosen wait is not honoured, said here
             // rather than left for someone to discover as a broken promise.

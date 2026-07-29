@@ -23,6 +23,9 @@ struct StillRunningApp: App {
                 .task {
                     store.prepareFirstRun()
                     store.startSampling()
+                    // Before the update check, which is the first thing that
+                    // would try to notify and find it cannot.
+                    await store.ensureNotificationsCanArrive()
                     await store.checkForUpdate()
                 }
         }

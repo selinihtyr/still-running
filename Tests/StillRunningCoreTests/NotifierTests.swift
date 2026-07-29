@@ -8,16 +8,22 @@ final class RecordingPresenter: NotificationPresenting, Sendable {
     private let storage = Locked<[String]>([])
     private let headlines = Locked<[String]>([])
     private let authorizationRequests = Locked<Int>(0)
+    /// Allowed by default, so every test that is not about permission reads the
+    /// way it did before macOS's answer was part of this at all.
+    private let permitted = Locked<Bool>(true)
 
     var messages: [String] { storage.withLock { $0 } }
     var titles: [String] { headlines.withLock { $0 } }
     var timesAsked: Int { authorizationRequests.withLock { $0 } }
+
+    func macOSWillShowNotifications(_ value: Bool) { permitted.withLock { $0 = value } }
 
     func present(title: String, body: String) {
         storage.withLock { $0.append(body) }
         headlines.withLock { $0.append(title) }
     }
     func requestAuthorization() { authorizationRequests.withLock { $0 += 1 } }
+    func canDeliver() async -> Bool { permitted.withLock { $0 } }
 }
 
 private func finding(identity: String, age: TimeInterval) -> Finding {

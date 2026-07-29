@@ -179,7 +179,7 @@ public final class Store {
         applyRememberedRelease()
         // Before the throttle, because the remembered answer is the one most
         // launches ever see: the check that found it may have been days ago.
-        announceRelease(silently: force)
+        await announceRelease(silently: force)
 
         // The daily throttle only makes sense once there is an answer to hold
         // on to. Having never had one, waiting out the day would leave the
@@ -201,24 +201,57 @@ public final class Store {
             defaults.set(Store.version, forKey: Self.rememberedReleaseKey)
         }
         update = result
-        announceRelease(silently: force)
+        await announceRelease(silently: force)
     }
 
     /// One notification per version, ever. The strip in the panel says it too,
     /// but only to someone who opens the panel — and this app has no window and
     /// no Dock icon, so months can pass without anyone opening anything. The
     /// people worth telling about a release are exactly the ones not looking.
-    private func announceRelease(silently: Bool) {
+    private func announceRelease(silently: Bool) async {
         guard case .available(let found) = update else { return }
         let key = "announcedRelease"
         let version = found.version.description
         guard defaults.string(forKey: key) != version else { return }
-        defaults.set(version, forKey: key)
 
         // Asking for the check yourself and then being told by a banner is
         // being told what is already on the screen. It still counts as said.
-        guard !silently else { return }
+        if silently {
+            defaults.set(version, forKey: key)
+            return
+        }
+
+        // The chance is only spent if it buys something. Marking a version
+        // announced and then handing the notification to a macOS that will not
+        // show it means the release is never mentioned again — which is how two
+        // versions in a row went unannounced to someone who had simply never
+        // been asked for permission.
+        guard await notifier.canDeliver() else { return }
+        defaults.set(version, forKey: key)
         notifier.announce(release: version, running: Store.version)
+    }
+
+    /// Whether notifications are switched on and going nowhere.
+    public private(set) var notificationsSilenced = false
+
+    /// macOS is asked for permission on the first launch, and a prompt that was
+    /// dismissed that once is never shown again by itself. Left alone that
+    /// leaves the setting reading "notify me after 8 hours" while nothing can
+    /// ever arrive, which is worse than the setting being off: it is off while
+    /// claiming to be on.
+    public func ensureNotificationsCanArrive() async {
+        guard settings.notifyAfter != nil else {
+            notificationsSilenced = false
+            return
+        }
+        if await notifier.canDeliver() {
+            notificationsSilenced = false
+            return
+        }
+        // Harmless when macOS has already made up its mind: it only presents a
+        // prompt the first time, and returns the standing answer after that.
+        notifier.requestAuthorization()
+        notificationsSilenced = !(await notifier.canDeliver())
     }
 
     private static let rememberedReleaseKey = "lastKnownRelease"

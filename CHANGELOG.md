@@ -2,6 +2,48 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.5.3] — 2026-07-29
+
+### Settings stops throwing you onto another desktop
+
+Opening Settings from a full-screen window slid the whole screen to a different
+desktop. A menu bar app is reached from the menu bar, which is on every Space;
+its window is not, and being an app with no Dock icon there was nothing to click
+your way back from.
+
+The cause took three wrong attempts to find, and none of the first two were the
+flag they looked like. A fixed-size SwiftUI window is born carrying
+`fullScreenNone` — banned outright from full-screen Spaces. `moveToActiveSpace`
+was being set correctly the whole time and could do nothing with it: the Space
+you are on is precisely the one the window may not enter, so macOS moved you to
+where it could live instead. AppKit re-imposes the ban as it puts the window on
+screen, quietly stripping the opposing flag back off, which is why setting this
+while the view was being attached looked right and changed nothing. It is now
+lifted after the window is shown, which is the only moment it holds — and on the
+path that a second opening actually takes.
+
+### It stops believing it told you about a release
+
+A version is announced once, ever, which is the right promise as long as the one
+chance buys something. It was being spent before the notification was handed
+over, and never checked against whether macOS would show anything — so on a Mac
+where notification permission had never been granted, 0.5.1 and 0.5.2 were both
+recorded as announced to someone who was never told either. Granting permission
+afterwards would not have helped: as far as the app was concerned, it had
+already spoken.
+
+The chance is now spent only when macOS says something will actually arrive.
+Anything undelivered is still owed, and turns up on the next check once
+notifications are allowed.
+
+### It notices when notifications are switched on and going nowhere
+
+macOS is asked for permission on the first launch, and a prompt dismissed that
+once is never shown again. That left the picker reading "notify me after 8
+hours" while nothing could ever arrive — off, while claiming to be on. The app
+now checks at each launch, asks again when there is something to ask about, and
+says so in Settings when the answer is no.
+
 ## [0.5.2] — 2026-07-29
 
 ### It stops waiting eight hours to mention a runaway

@@ -27,6 +27,19 @@ import AppKit
     #expect(behaviour.contains(.managed))
 }
 
+/// The one that actually caused the jump. A window carrying `fullScreenNone`
+/// is banned from full-screen Spaces, so when the Space you are on is a
+/// full-screen app, macOS cannot bring the window to you and moves you to it
+/// instead — and `moveToActiveSpace` sits there looking correct while being
+/// powerless. AppKit enforces the ban by quietly stripping `fullScreenAuxiliary`
+/// back off, which is how this was finally caught.
+@Test func liftsTheBanThatKeepsItOffFullScreenSpaces() {
+    let behaviour = WindowBehaviour.followingTheActiveSpace(from: [.fullScreenNone])
+
+    #expect(!behaviour.contains(.fullScreenNone))
+    #expect(behaviour.contains(.fullScreenAuxiliary))
+}
+
 /// Following the active Space and being pinned to every Space are contradictory
 /// requests, and AppKit resolves the pair by ignoring the one we depend on.
 @Test func dropsTheAllSpacesPinThatWouldCancelIt() {

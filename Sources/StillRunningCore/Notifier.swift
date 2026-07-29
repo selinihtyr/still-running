@@ -8,6 +8,10 @@ import Detectors
 public protocol NotificationPresenting: Sendable {
     func present(title: String, body: String)
     func requestAuthorization()
+    /// Whether macOS would actually put anything on screen. `present` cannot
+    /// answer this — it hands the notification over and returns either way —
+    /// so anything that spends a one-time chance has to ask first.
+    func canDeliver() async -> Bool
 }
 
 public struct SystemNotificationPresenter: NotificationPresenting {
@@ -23,6 +27,11 @@ public struct SystemNotificationPresenter: NotificationPresenting {
     public func requestAuthorization() {
         guard insideAnApp else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    public func canDeliver() async -> Bool {
+        guard insideAnApp else { return false }
+        return await Notifier.permission() == .allowed
     }
 
     public func present(title: String, body: String) {
@@ -123,6 +132,11 @@ public struct Notifier: Sendable {
 
     public func requestAuthorization() {
         presenter.requestAuthorization()
+    }
+
+    /// Whether anything sent from here would be seen.
+    public func canDeliver() async -> Bool {
+        await presenter.canDeliver()
     }
 
     /// For callers that only have the type, such as the settings window.

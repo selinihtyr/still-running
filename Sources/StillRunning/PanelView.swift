@@ -307,6 +307,14 @@ struct PanelView: View {
             .help("Check again")
             Button {
                 openWindow(id: "settings")
+                // After the window is on screen, never before: showing it is
+                // when AppKit puts back the ban that drags you to another Space.
+                // This is also the only path that reaches a window being opened
+                // a second time, where nothing is attached and nothing fires.
+                if let settings = WindowBehaviour.window(withIdentifier: "settings",
+                                                         among: NSApp.windows) {
+                    WindowBehaviour.followTheActiveSpace(settings)
+                }
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
                 Image(systemName: "gearshape")
