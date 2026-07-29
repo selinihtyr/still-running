@@ -4,22 +4,27 @@ What changed, in the words of someone using it rather than someone writing it.
 
 ## [0.5.1] — 2026-07-29
 
-### The runaway shell 0.5.0 promised to notice
+There is no 0.5.0 to download: it was built, driven, and found wanting before
+it went anywhere. Everything it was going to say is here.
 
-0.5.0 said it would show a shell burning a core. Driven on a real machine it
-did not: an orphaned `/bin/sh` at 97%, three and a half minutes in, still only
-turned up in the informational list at the bottom with no button on it.
+### It stops disappearing from the menu bar
 
-The rule asked whether the process had been busy across the same three-minute
-window every other rule uses, and that answer is nil until a process has
-existed for the whole of it — a single interval reaching back past its birth is
-enough to void it. So the first minutes of a runaway were exactly the minutes
-it stayed hidden, which is when somebody is sitting in front of a hot laptop
-wondering what is going on. It now asks the same question the "busy, but yours"
-list asks, over the same half minute, so one thing cannot be busy in one part
-of the panel and quiet in another.
+The login item could end up pointing at a copy in a `build` folder rather than
+the one in Applications — a built copy is a bundle like any other, so the first
+one to run registered itself, and registration happens once so that switching
+it off in Settings sticks. The copy you installed could then never take it
+back.
 
-## [0.5.0] — 2026-07-29
+On its own that is untidy. What made it a disappearing act is that both scripts
+begin by deleting the bundle they are about to write, and macOS pages an
+executable in as it goes: delete it while it runs and the next page the process
+needs is gone, so it dies with a bus error. An app quietly vanishing from the
+menu bar was the outside view of that.
+
+The login item is now only ever offered to a copy in `/Applications` or
+`~/Applications`, a copy anywhere else hands back one it should never have been
+given, and both scripts quit a running copy before replacing it. If you are
+already in this state, running the built copy once puts it right.
 
 ### It says what is keeping this Mac awake
 
@@ -58,6 +63,15 @@ still counts as said, so nothing turns up later about the same version. The
 switch that governs it is the one for checking at all.
 
 ### A shell burning a core is no longer filed under "core binaries"
+
+Driving this on a real machine is what found the version of it that did not
+work: the rule asked for sustained load over the same three-minute window every
+other rule uses, and that answer is nil until a process has existed for the
+whole of it — one interval reaching back past its birth voids the query. A
+runaway was therefore hidden for its first few minutes, which is when somebody
+is sitting in front of a hot laptop wondering what is going on. It asks over
+half a minute now, the same as the list below it.
+
 
 `/bin` and `/usr/bin` were skipped when looking for orphans, and rightly: they
 hold Apple's own tools, and the shell a closed terminal leaves behind is
