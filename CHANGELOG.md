@@ -45,6 +45,12 @@ quitting your browser because it is playing audio would be a worse bug than the
 one this exists to fix. Neither is anything launchd manages, because a button
 that stops something launchd starts again is a button that does nothing twice.
 
+Apple's own apps are named like anyone else's. Music, TV and Podcasts live
+inside `/System`, which the rule for "this is macOS talking to itself" was
+skipping wholesale — so music left playing overnight, one of the most ordinary
+ways there is to meet a flat battery, was the single case that could never be
+named. The rest of `/System` is still macOS talking to itself.
+
 Things that release themselves are never mentioned. Tools wrap commands in
 `caffeinate -t 300` by the dozen and not one of them is something anyone
 forgot. Nor is macOS talking to itself: `sharingd` holds one for Handoff and

@@ -119,8 +119,13 @@ public struct AwakeDetector: Detector {
     /// the display is on" are macOS explaining itself to itself. They run as
     /// the user and can never be stopped, and listing them would bury the one
     /// line that matters under three that never change.
+    /// `/System/Applications` is the exception, and it matters: Music, TV and
+    /// Podcasts live there, and music left playing overnight is one of the most
+    /// ordinary ways there is to meet a flat battery in the morning. Skipping
+    /// all of `/System` made that the one case that could never be named.
     static func isPartOfMacOS(_ process: ProcessSample) -> Bool {
         let path = process.executablePath
+        if path.hasPrefix("/System/Applications/") { return false }
         return path.hasPrefix("/System/") || path.hasPrefix("/usr/libexec/")
             || path.hasPrefix("/usr/sbin/") || path.hasPrefix("/Library/Apple/")
     }

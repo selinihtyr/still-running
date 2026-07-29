@@ -90,6 +90,36 @@ private let settings = Settings()
     #expect(AwakeDetector.holders(in: snapshot, settings: settings).isEmpty)
 }
 
+@Test func applesOwnAppsAreNamedLikeAnyOther() {
+    // Music, TV and Podcasts live under /System/Applications, which the rule
+    // for "this is macOS talking to itself" was skipping wholesale. Leaving
+    // music playing overnight is one of the most ordinary ways there is to
+    // find a flat battery in the morning, and it was the one case that could
+    // never be named.
+    let music = Fixtures.process(pid: 6100, path: "/System/Applications/Music.app/Contents/MacOS/Music",
+                                 args: ["Music"], ageHours: 9)
+    let snapshot = Fixtures.snapshot(processes: [music], assertions: [
+        Fixtures.assertion(pid: 6100, type: "NoIdleSleepAssertion",
+                           name: "Playing audio", heldHours: 8),
+    ])
+
+    let holders = AwakeDetector.holders(in: snapshot, settings: settings)
+    #expect(holders.count == 1)
+    #expect(holders[0].name == "Music")
+    // Still an app, so still only named — never offered up.
+    #expect(AwakeDetector().findings(in: snapshot, history: History(), settings: settings).isEmpty)
+}
+
+@Test func theRestOfTheSystemIsStillMacOSTalkingToItself() {
+    let daemon = Fixtures.process(pid: 106, path: "/System/Library/CoreServices/powerd.bundle/powerd",
+                                  args: ["powerd"], ageHours: 11)
+    let snapshot = Fixtures.snapshot(processes: [daemon], assertions: [
+        Fixtures.assertion(pid: 106, name: "Powerd - Prevent sleep while display is on", heldHours: 10),
+    ])
+
+    #expect(AwakeDetector.holders(in: snapshot, settings: settings).isEmpty)
+}
+
 @Test func anAppIsNamedButNeverOfferedUp() {
     // Chrome playing audio is worth knowing about. Quitting someone's browser
     // because of it would be a worse bug than the one this row exists to fix.
