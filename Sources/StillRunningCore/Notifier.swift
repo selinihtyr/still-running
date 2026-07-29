@@ -70,29 +70,45 @@ public struct Notifier: Sendable {
         }
     }
 
+    /// Something eating this much of the machine is its own reason to speak, with
+    /// or without a word from macOS about temperature.
+    static let runawayCPUPercent: Double = 50
+
     /// `notifyAfter` answers "how long before you would want to know?", and eight
     /// hours is the right answer for something sitting idle. It is the wrong
-    /// answer when the fans are already up: by the time the timer agrees, the
-    /// machine has been throttling for most of a working day. So while macOS
-    /// says the Mac is hot, the bar drops to the age at which the panel already
-    /// calls something forgotten.
+    /// answer for something with a core pinned: by the time the timer agrees, it
+    /// has been cooking the machine for most of a working day. So for that case
+    /// the bar drops to the age at which the panel already calls something
+    /// forgotten.
     ///
-    /// Both remaining conditions matter. Age keeps this from naming the build
-    /// you started a minute ago — heat is not a reason to talk about something
-    /// nobody has forgotten. CPU keeps it to things that could plausibly be the
-    /// cause: a sleeping container is not what is cooking anything, and blaming
-    /// it would teach you to distrust the notification.
+    /// What counts as cooking depends on whether macOS is corroborating. Its
+    /// `thermalState` is the reading that makes fans spin, so when it says the
+    /// Mac is hot the ordinary "sustained" bar is enough. It cannot be *required*
+    /// though: it is conservative, it has never been seen above nominal on the
+    /// machine this was written on, and a feature that waits for it may simply
+    /// never fire. So without it the bar is a runaway — half the machine — which
+    /// is not a temperature claim but an observation the app makes itself.
+    ///
+    /// Age guards both paths. It keeps this from naming the build started a
+    /// minute ago: a busy process is not a forgotten one, and the whole promise
+    /// of the app is that it talks about things you left behind.
     static func isCooking(_ finding: Finding, settings: Settings, thermal: Thermal) -> Bool {
-        guard thermal == .serious || thermal == .critical else { return false }
-        return finding.age >= settings.minimumAge
-            && finding.cpuPercent >= settings.sustainedCPUPercent
+        guard finding.age >= settings.minimumAge else { return false }
+        let bar = thermal == .serious || thermal == .critical
+            ? settings.sustainedCPUPercent
+            : runawayCPUPercent
+        return finding.cpuPercent >= bar
     }
 
-    /// Leads with the heat, because that is the part that is not obvious and the
-    /// reason this arrived before the timer did.
+    /// Leads with the heat when macOS reported some, because that is the part
+    /// that is not obvious. When it did not, the CPU figure carries the sentence
+    /// alone — claiming a temperature nobody measured would be putting words in
+    /// the system's mouth.
     static func hotBody(_ finding: Finding, thermal: Thermal) -> String {
-        "This Mac is running \(thermal.label). \(finding.title) has been up for "
-            + "\(Formatting.duration(finding.age)) and is using \(Int(finding.cpuPercent))% CPU."
+        let fact = "\(finding.title) has been up for \(Formatting.duration(finding.age)) "
+            + "and is using \(Int(finding.cpuPercent))% CPU."
+        guard thermal == .serious || thermal == .critical else { return fact }
+        return "This Mac is running \(thermal.label). \(fact)"
     }
 
     /// Said once per version, by the caller. Deliberately not gated on

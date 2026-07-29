@@ -43,6 +43,16 @@ struct SettingsView: View {
             Picker("Notify me", selection: notifyBinding) {
                 ForEach(notifyChoices, id: \.label) { Text($0.label).tag($0.value) }
             }
+            // The one case where the chosen wait is not honoured, said here
+            // rather than left for someone to discover as a broken promise.
+            if store.settings.notifyAfter != nil {
+                Text("Sooner than this for anything running away with the machine — "
+                     + "a forgotten process on half your CPU is said once it is old "
+                     + "enough to count as forgotten.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Section {
                 Toggle("Start at login", isOn: loginBinding)

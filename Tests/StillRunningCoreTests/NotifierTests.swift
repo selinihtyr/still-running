@@ -141,16 +141,61 @@ private func burning(identity: String, age: TimeInterval, cpu: Double) -> Findin
     #expect(presenter.messages.isEmpty)
 }
 
-@Test func aWarmMachineIsNotHotEnoughToSpeakEarly() {
+/// Steadily busy is not the same as eating the machine. When macOS has not
+/// said anything, 30% earns the wait the user asked for.
+@Test func aWarmMachineIsNotHotEnoughToSpeakEarlyAboutAModestBurn() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 30)],
+                      settings: settings, thermal: .fair)
+
+    #expect(presenter.messages.isEmpty)
+}
+
+/// The feature cannot depend on macOS admitting the Mac is hot, because it may
+/// never say so. Something eating half the machine for hours is its own reason.
+@Test func notifiesAboutSomethingEatingHalfTheMachineEvenWhenMacOSSaysNothing() {
     let presenter = RecordingPresenter()
     var settings = Settings()
     settings.notifyAfter = 8 * 3600
     var notifier = Notifier(presenter: presenter)
 
     notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
-                      settings: settings, thermal: .fair)
+                      settings: settings, thermal: .nominal)
 
-    #expect(presenter.messages.isEmpty)
+    #expect(presenter.messages.count == 1)
+    #expect(presenter.messages[0].contains("88%"))
+}
+
+/// Saying "this Mac is hot" when macOS never said so would be putting words in
+/// its mouth. The CPU number is the part that is actually observed.
+@Test func doesNotClaimHeatWhenMacOSHasNotReportedAny() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: settings, thermal: .nominal)
+
+    #expect(!presenter.messages[0].lowercased().contains("hot"))
+}
+
+/// A hot Mac lowers the bar rather than being the whole of it: 30% is not worth
+/// speaking early about on its own, and is once macOS says the fans are up.
+@Test func heatLowersTheBarForAModestBurn() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 30)],
+                      settings: settings, thermal: .serious)
+
+    #expect(presenter.messages.count == 1)
 }
 
 /// The early nudge is still one nudge. Every sample while the Mac is hot must

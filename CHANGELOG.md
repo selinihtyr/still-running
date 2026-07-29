@@ -2,6 +2,42 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.5.2] — 2026-07-29
+
+### It stops waiting eight hours to mention a runaway
+
+A laptop was hot enough to be worth complaining about. The panel already knew
+why: a headless browser left behind by an automation script, seventy processes,
+about 9.8 GB, holding 88% of the CPU for two hours and eighteen minutes. The
+detector had caught it, the panel had ranked it first, and stopping it dropped
+the machine from 15 GB of memory in use to 11 GB and the load average from 5.0
+to 3.6.
+
+None of which was any use, because nobody looked at the panel. Notifications
+were set to eight hours, 2h18m is not eight hours, and so the app sat on the
+answer and said nothing. Eight hours is a sensible wait for something dozing.
+It is the wrong wait for something with half your machine in its teeth — by the
+time the timer agrees, it has been cooking the laptop for most of a working
+day.
+
+The wait you choose is still the wait you get, with one exception: anything
+using half the CPU or more is mentioned as soon as it is old enough to count as
+forgotten. That is a deliberately high bar. A dev server ticking over at 30%
+still waits, because being busy is not the same as running away with the
+machine, and a notification you learn to dismiss is worse than none.
+
+If macOS does report the Mac as hot, the bar drops to the ordinary sustained
+one — 30% is worth saying when the fans are already up. It is only ever a
+bonus, though, never the trigger. `thermalState` is the reading that makes fans
+spin, but it is conservative, and on the machine this was written on it was
+never once seen above nominal — including while the laptop was hot enough to
+start this whole thing. A feature that waited for it might simply never have
+fired.
+
+The Settings window now says all of this next to the picker, so the one time
+the app does not honour your number is not left to be discovered as a broken
+promise.
+
 ## [0.5.1] — 2026-07-29
 
 There is no 0.5.0 to download: it was built, driven, and found wanting before
