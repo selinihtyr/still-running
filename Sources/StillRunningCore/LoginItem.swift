@@ -47,6 +47,22 @@ public enum LoginItem {
         isAvailable(bundlePath: Bundle.main.bundleURL.path)
     }
 
+    /// True when this copy is holding something it may not hold. A bundle
+    /// outside Applications can still have a registration from before that rule
+    /// existed, and the copy in Applications cannot take it away — only the one
+    /// that has it can give it back.
+    public static func shouldRelease(bundlePath: String, home: String = NSHomeDirectory()) -> Bool {
+        bundlePath.hasSuffix(".app") && !isAvailable(bundlePath: bundlePath, home: home)
+    }
+
+    /// Hands back a login item this copy should never have been given. Running
+    /// a built copy once is then enough to undo it, which matters because the
+    /// installed app has no way to reach the other one's registration.
+    public static func releaseIfNotAllowed() {
+        guard shouldRelease(bundlePath: Bundle.main.bundleURL.path) else { return }
+        try? SMAppService.mainApp.unregister()
+    }
+
     public static var state: State {
         guard isAvailable else { return .unavailable }
         switch SMAppService.mainApp.status {

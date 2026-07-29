@@ -152,6 +152,12 @@ public final class Store {
     /// Registered once — on a fresh install, or on the first launch of a version
     /// that has this — and never again, so switching it off in Settings sticks.
     private func ensureItSurvivesARestart() {
+        // First, give back what this copy should not be holding. A build that
+        // ran before it was installed took the login item and kept it, and the
+        // installed copy has no way to reach another bundle's registration —
+        // only the bundle that has it can let go.
+        LoginItem.releaseIfNotAllowed()
+
         let key = "hasRegisteredLoginItem"
         guard !defaults.bool(forKey: key), LoginItem.isAvailable else { return }
         defaults.set(true, forKey: key)

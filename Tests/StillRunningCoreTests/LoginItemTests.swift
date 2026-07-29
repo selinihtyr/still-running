@@ -33,3 +33,15 @@ import Foundation
     #expect(!LoginItem.isAvailable(bundlePath: "/Users/x/Desktop/Still Running.app", home: "/Users/x"))
     #expect(!LoginItem.isAvailable(bundlePath: "/Volumes/Downloads/Still Running.app"))
 }
+
+@Test func aCopyThatMayNotHoldTheLoginItemGivesItBack() {
+    // The installed app cannot reach another bundle's registration, so the one
+    // holding it has to let go itself. Running the built copy once does it.
+    #expect(LoginItem.shouldRelease(bundlePath: "/Users/x/still-running/build/Still Running.app",
+                                    home: "/Users/x"))
+    #expect(!LoginItem.shouldRelease(bundlePath: "/Applications/Still Running.app", home: "/Users/x"))
+    // A bare binary out of .build never had a registration to give back, and
+    // asking macOS to unregister one would only raise an error to swallow.
+    #expect(!LoginItem.shouldRelease(bundlePath: "/Users/x/still-running/.build/release/StillRunning",
+                                     home: "/Users/x"))
+}
