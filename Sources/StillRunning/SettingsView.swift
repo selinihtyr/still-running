@@ -2,6 +2,22 @@ import SwiftUI
 import Detectors
 import StillRunningCore
 
+/// SwiftUI has no modifier for a window's collection behaviour, so the only way
+/// to the setting that stops Settings dragging you to another Space is the
+/// AppKit window behind the scene. The window is not attached yet while the
+/// view is being made, which is why this waits for the next pass.
+private struct SpaceFollower: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.collectionBehavior =
+                WindowBehaviour.followingTheActiveSpace(from: window.collectionBehavior)
+        }
+    }
+}
+
 struct SettingsView: View {
     @Bindable var store: Store
     @Environment(\.dismiss) private var dismiss
@@ -117,6 +133,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 440, height: 520)
+        .background(SpaceFollower())
         .onAppear { loginItem = LoginItem.state }
         .onChange(of: store.settings.notifyAfter) { _, new in
             if new != nil { Notifier.requestAuthorization() }
