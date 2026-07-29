@@ -49,19 +49,50 @@ public struct Notifier: Sendable {
         self.presenter = presenter
     }
 
-    public mutating func consider(_ findings: [Finding], settings: Settings) {
+    public mutating func consider(_ findings: [Finding], settings: Settings,
+                                  thermal: Thermal = .nominal) {
         guard let threshold = settings.notifyAfter else { return }
-        for finding in findings where finding.age >= threshold && !notified.contains(finding.identity) {
+        for finding in findings where !notified.contains(finding.identity) {
+            let due = finding.age >= threshold
+            let early = !due && Self.isCooking(finding, settings: settings, thermal: thermal)
+            guard due || early else { continue }
             notified.insert(finding.identity)
             presenter.present(
                 title: "Still running",
-                // A wake lock's age is how long it has been held, not how long
-                // the process has been up, so "running for" would be the wrong
-                // sentence about the right number.
-                body: finding.kind == .keepingAwake
-                    ? "\(finding.title), for \(Formatting.duration(finding.age))."
-                    : "\(finding.title) has been running for \(Formatting.duration(finding.age)).")
+                body: early
+                    ? Self.hotBody(finding, thermal: thermal)
+                    // A wake lock's age is how long it has been held, not how long
+                    // the process has been up, so "running for" would be the wrong
+                    // sentence about the right number.
+                    : finding.kind == .keepingAwake
+                        ? "\(finding.title), for \(Formatting.duration(finding.age))."
+                        : "\(finding.title) has been running for \(Formatting.duration(finding.age)).")
         }
+    }
+
+    /// `notifyAfter` answers "how long before you would want to know?", and eight
+    /// hours is the right answer for something sitting idle. It is the wrong
+    /// answer when the fans are already up: by the time the timer agrees, the
+    /// machine has been throttling for most of a working day. So while macOS
+    /// says the Mac is hot, the bar drops to the age at which the panel already
+    /// calls something forgotten.
+    ///
+    /// Both remaining conditions matter. Age keeps this from naming the build
+    /// you started a minute ago — heat is not a reason to talk about something
+    /// nobody has forgotten. CPU keeps it to things that could plausibly be the
+    /// cause: a sleeping container is not what is cooking anything, and blaming
+    /// it would teach you to distrust the notification.
+    static func isCooking(_ finding: Finding, settings: Settings, thermal: Thermal) -> Bool {
+        guard thermal == .serious || thermal == .critical else { return false }
+        return finding.age >= settings.minimumAge
+            && finding.cpuPercent >= settings.sustainedCPUPercent
+    }
+
+    /// Leads with the heat, because that is the part that is not obvious and the
+    /// reason this arrived before the timer did.
+    static func hotBody(_ finding: Finding, thermal: Thermal) -> String {
+        "This Mac is running \(thermal.label). \(finding.title) has been up for "
+            + "\(Formatting.duration(finding.age)) and is using \(Int(finding.cpuPercent))% CPU."
     }
 
     /// Said once per version, by the caller. Deliberately not gated on

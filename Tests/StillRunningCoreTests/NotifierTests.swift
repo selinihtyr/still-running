@@ -69,3 +69,102 @@ private func finding(identity: String, age: TimeInterval) -> Finding {
 
     #expect(presenter.messages.count == 2)
 }
+
+// MARK: - Speaking up early while the machine is hot
+
+private func burning(identity: String, age: TimeInterval, cpu: Double) -> Finding {
+    Finding(identity: identity, kind: .isolatedBrowser, title: "Chrome · automation",
+            detail: "d", cpuPercent: cpu, memoryBytes: 0, age: age,
+            target: .processes([1000]), severity: .urgent)
+}
+
+@Test func notifiesBeforeTheThresholdWhenTheMachineIsHot() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: settings, thermal: .serious)
+
+    #expect(presenter.messages.count == 1)
+    #expect(presenter.messages[0].contains("Chrome · automation"))
+}
+
+@Test func saysTheHeatIsWhyItSpokeEarly() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: settings, thermal: .critical)
+
+    #expect(presenter.messages[0].lowercased().contains("hot")
+            || presenter.messages[0].lowercased().contains("throttling"))
+}
+
+@Test func staysQuietWhenHotIfTheFindingIsNotBurningCPU() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 1)],
+                      settings: settings, thermal: .serious)
+
+    #expect(presenter.messages.isEmpty)
+}
+
+/// Heat is not a reason to name something started a minute ago: the panel does
+/// not call it forgotten yet, and neither should a notification.
+@Test func staysQuietWhenHotBelowTheForgottenAge() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 600, cpu: 88)],
+                      settings: settings, thermal: .serious)
+
+    #expect(presenter.messages.isEmpty)
+}
+
+/// Off means off. A hot machine is not consent to start notifying.
+@Test func staysSilentWhenHotAndNotificationsAreOff() {
+    let presenter = RecordingPresenter()
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: Settings(), thermal: .critical)
+
+    #expect(presenter.messages.isEmpty)
+}
+
+@Test func aWarmMachineIsNotHotEnoughToSpeakEarly() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: settings, thermal: .fair)
+
+    #expect(presenter.messages.isEmpty)
+}
+
+/// The early nudge is still one nudge. Every sample while the Mac is hot must
+/// not be another notification for the same thing.
+@Test func notifiesOnlyOnceWhileTheMachineStaysHot() {
+    let presenter = RecordingPresenter()
+    var settings = Settings()
+    settings.notifyAfter = 8 * 3600
+    var notifier = Notifier(presenter: presenter)
+
+    notifier.consider([burning(identity: "a", age: 2.5 * 3600, cpu: 88)],
+                      settings: settings, thermal: .serious)
+    notifier.consider([burning(identity: "a", age: 3 * 3600, cpu: 90)],
+                      settings: settings, thermal: .serious)
+
+    #expect(presenter.messages.count == 1)
+}

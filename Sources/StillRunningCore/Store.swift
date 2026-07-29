@@ -286,7 +286,7 @@ public final class Store {
         keepingAwake = result.keepingAwake
         // A finding that vanished cannot still be forceable.
         forceableIdentities.formIntersection(Set(findings.map(\.identity)))
-        notifier.consider(findings, settings: settings)
+        notifier.consider(findings, settings: settings, thermal: thermal)
     }
 
     public func isStopping(_ finding: Finding) -> Bool { inFlight.contains(finding.identity) }
