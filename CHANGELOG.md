@@ -29,6 +29,31 @@ forgot. Nor is macOS talking to itself: `sharingd` holds one for Handoff and
 `powerd` holds one whenever the display is on, forever, and neither can be
 stopped by anyone.
 
+### It tells you a new version is out
+
+Until now the only place a release was mentioned was a strip in the panel —
+which reaches exactly the people who open the panel. This app has no window and
+no Dock icon, so months can pass without anyone opening anything, and the whole
+point of noticing a release is reaching the people who are not looking. There
+is now one notification per version, ever. Asking for the check yourself in
+Settings does not produce one, because the answer is already on the screen; it
+still counts as said, so nothing turns up later about the same version. The
+switch that governs it is the one for checking at all.
+
+### A shell burning a core is no longer filed under "core binaries"
+
+`/bin` and `/usr/bin` were skipped when looking for orphans, and rightly: they
+hold Apple's own tools, and the shell a closed terminal leaves behind is
+reparented to launchd, where nobody wants to be told about it. But they also
+hold your own tools. Two `/bin/sh -c 'while :; do :; done'`, orphaned by an
+interrupted test run, pinned a core each on this machine for eight minutes, and
+the app that exists to notice exactly that said nothing at all.
+
+Those directories are still skipped while what is in them is quiet. They are
+not skipped when something there has been burning a core for minutes. macOS's
+own helpers stay out either way, so Spotlight indexing does not become an
+alarm.
+
 ### The panel stopped doing its thinking on the main thread
 
 Working out what is running is about twenty milliseconds of matching across

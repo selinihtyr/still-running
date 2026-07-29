@@ -208,3 +208,59 @@ private final class EmptySource: SnapshotSource {
     // It asked, rather than staying silent about versions for a day.
     #expect(store.update != .unknown)
 }
+
+@MainActor
+@Test func tellsYouOnceThatAVersionIsOut() async {
+    // The strip in the panel only reaches someone who opens the panel, and an
+    // app with no window is one nobody opens for months. Reaching the people
+    // who are not looking is the entire point of noticing a release.
+    let defaults = UserDefaults(suiteName: "announce-\(UUID().uuidString)")!
+    defaults.set("9.9.9", forKey: "lastKnownRelease")
+    defaults.set("https://example.com/r", forKey: "lastKnownReleasePage")
+    defaults.set(Date(), forKey: "lastUpdateCheck")
+    let presenter = RecordingPresenter()
+
+    let store = Store(source: EmptySource(), defaults: defaults,
+                      notifier: Notifier(presenter: presenter))
+    await store.checkForUpdate()
+    await store.checkForUpdate()   // every launch reaches this; once is once
+
+    #expect(presenter.titles.count == 1)
+    #expect(presenter.titles[0].contains("9.9.9"))
+}
+
+@MainActor
+@Test func doesNotTellYouWhatYouAreAlreadyLookingAt() async {
+    // Pressing "Check now" in Settings and then being told by a banner is
+    // being told something already on the screen. It still counts as said, so
+    // no banner turns up later for the same version.
+    let defaults = UserDefaults(suiteName: "asked-\(UUID().uuidString)")!
+    defaults.set("9.9.9", forKey: "lastKnownRelease")
+    defaults.set("https://example.com/r", forKey: "lastKnownReleasePage")
+    defaults.set(Date(), forKey: "lastUpdateCheck")
+    let presenter = RecordingPresenter()
+
+    let store = Store(source: EmptySource(), defaults: defaults,
+                      notifier: Notifier(presenter: presenter))
+    await store.checkForUpdate(force: true)
+    await store.checkForUpdate()
+
+    #expect(presenter.titles.isEmpty)
+}
+
+@MainActor
+@Test func staysQuietAboutAReleaseWhenTheCheckIsSwitchedOff() async {
+    // The switch that governs whether this app cares about releases at all
+    // governs whether it may interrupt you about one.
+    let defaults = UserDefaults(suiteName: "quiet-\(UUID().uuidString)")!
+    defaults.set("9.9.9", forKey: "lastKnownRelease")
+    defaults.set("https://example.com/r", forKey: "lastKnownReleasePage")
+    let presenter = RecordingPresenter()
+
+    let store = Store(source: EmptySource(), defaults: defaults,
+                      notifier: Notifier(presenter: presenter))
+    store.settings.checksForUpdates = false
+    await store.checkForUpdate()
+
+    #expect(presenter.titles.isEmpty)
+}

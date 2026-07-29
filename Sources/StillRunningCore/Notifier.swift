@@ -13,11 +13,20 @@ public protocol NotificationPresenting: Sendable {
 public struct SystemNotificationPresenter: NotificationPresenting {
     public init() {}
 
+    /// `UNUserNotificationCenter.current()` does not fail when there is no app
+    /// bundle around it — it aborts the process, which no caller can defend
+    /// against. Every path here was reachable only from code that happened to
+    /// be switched off in tests, until one that was not: a whole run died with
+    /// signal 6. Asking first is what makes this type safe to hold anywhere.
+    private var insideAnApp: Bool { Bundle.main.bundleURL.pathExtension == "app" }
+
     public func requestAuthorization() {
+        guard insideAnApp else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     public func present(title: String, body: String) {
+        guard insideAnApp else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -53,6 +62,16 @@ public struct Notifier: Sendable {
                     ? "\(finding.title), for \(Formatting.duration(finding.age))."
                     : "\(finding.title) has been running for \(Formatting.duration(finding.age)).")
         }
+    }
+
+    /// Said once per version, by the caller. Deliberately not gated on
+    /// `notifyAfter`: that setting is about things you left running, while this
+    /// is the answer to the question the update check exists to ask. The switch
+    /// that governs it is the one for checking at all.
+    public func announce(release version: String, running current: String) {
+        presenter.present(
+            title: "Still Running \(version) is out",
+            body: "You are on \(current). Open the panel to update — it builds from source in a Terminal window.")
     }
 
     public func requestAuthorization() {

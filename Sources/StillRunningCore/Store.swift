@@ -177,6 +177,9 @@ public final class Store {
         // relaunch inside the daily window would know nothing at all, and the
         // panel would go back to saying nothing until tomorrow.
         applyRememberedRelease()
+        // Before the throttle, because the remembered answer is the one most
+        // launches ever see: the check that found it may have been days ago.
+        announceRelease(silently: force)
 
         // The daily throttle only makes sense once there is an answer to hold
         // on to. Having never had one, waiting out the day would leave the
@@ -198,6 +201,24 @@ public final class Store {
             defaults.set(Store.version, forKey: Self.rememberedReleaseKey)
         }
         update = result
+        announceRelease(silently: force)
+    }
+
+    /// One notification per version, ever. The strip in the panel says it too,
+    /// but only to someone who opens the panel — and this app has no window and
+    /// no Dock icon, so months can pass without anyone opening anything. The
+    /// people worth telling about a release are exactly the ones not looking.
+    private func announceRelease(silently: Bool) {
+        guard case .available(let found) = update else { return }
+        let key = "announcedRelease"
+        let version = found.version.description
+        guard defaults.string(forKey: key) != version else { return }
+        defaults.set(version, forKey: key)
+
+        // Asking for the check yourself and then being told by a banner is
+        // being told what is already on the screen. It still counts as said.
+        guard !silently else { return }
+        notifier.announce(release: version, running: Store.version)
     }
 
     private static let rememberedReleaseKey = "lastKnownRelease"
