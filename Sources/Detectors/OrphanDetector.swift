@@ -8,14 +8,29 @@ public struct OrphanDetector: Detector {
 
     public init() {}
 
+    /// macOS's own, always skipped. Nothing here is ever a stray command
+    /// somebody left behind, and Spotlight's workers alone would otherwise
+    /// raise a false alarm every time the machine indexes anything.
     private static let systemPrefixes = ["/System/", "/Library/", "/usr/libexec/",
-                                         "/usr/sbin/", "/sbin/", "/usr/bin/", "/bin/"]
+                                         "/usr/sbin/", "/sbin/"]
+    /// Apple's core tools live here and so do a person's own: `sh`, `sleep`,
+    /// the shell a closed terminal leaves reparented to launchd. Skipped while
+    /// quiet, because nobody wants to be told about a sleeping `-zsh` — but not
+    /// while burning a core. Two `/bin/sh -c 'while :; do :; done'` orphaned by
+    /// an interrupted test run pinned a core each here for eight minutes, and
+    /// this list is why nothing said so.
+    private static let sharedPrefixes = ["/usr/bin/", "/bin/"]
     /// Anything shipped inside a bundle is managed by whatever launched it.
     private static let bundleMarkers = [".app/Contents/", ".xpc/Contents/",
                                         ".appex/Contents/", ".framework/"]
 
     public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
         snapshot.processes.compactMap { process -> Finding? in
+            // Sustained, not a spike: a command that flares for one interval on
+            // its way out must not turn a skipped directory into a finding.
+            let busy = (history.sustainedCPU(pid: process.pid, over: settings.sustainedCPUWindow) ?? 0)
+                >= settings.sustainedCPUPercent
+
             guard process.uid == snapshot.currentUID,
                   process.pid != snapshot.ownPID,
                   process.ppid == 1,
@@ -23,6 +38,7 @@ public struct OrphanDetector: Detector {
                   !snapshot.managedPIDs.contains(process.pid),   // a service, not a stray
                   !Self.isBundled(process),
                   !Self.isSystemPath(process.executablePath),
+                  !Self.isSharedPath(process.executablePath) || busy,
                   !IsolatedBrowserDetector.isBrowser(process)   // the browser detector owns those
             else { return nil }
 
@@ -59,5 +75,10 @@ public struct OrphanDetector: Detector {
 
     static func isSystemPath(_ path: String) -> Bool {
         systemPrefixes.contains { path.hasPrefix($0) }
+    }
+
+    /// Shared ground: Apple's core tools and yours, in the same directory.
+    static func isSharedPath(_ path: String) -> Bool {
+        sharedPrefixes.contains { path.hasPrefix($0) }
     }
 }

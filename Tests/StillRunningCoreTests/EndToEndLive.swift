@@ -133,7 +133,12 @@ private var dockerIsRunning: Bool {
     // reading them as nanoseconds made a busy loop read as 2%.
     let burner = Process()
     burner.executableURL = URL(fileURLWithPath: "/bin/sh")
-    burner.arguments = ["-c", "while :; do :; done"]
+    // Its own deadline, not the test's. `defer` does not run when the test
+    // process is killed or a run is interrupted, and a busy loop that outlives
+    // it is orphaned onto launchd pinning a core — which is exactly what
+    // happened on this machine, for eight minutes, while nobody could see it.
+    // The watchdog is inside the same shell, so it survives whatever happens here.
+    burner.arguments = ["-c", "( sleep 30; kill $$ ) & while :; do :; done"]
     try? burner.run()
     defer { burner.terminate() }
 
@@ -160,7 +165,7 @@ private var dockerIsRunning: Bool {
     let burner = Process()
     burner.executableURL = URL(fileURLWithPath: "/bin/sh")
     // Idle first, so the long gap has nothing in it, then pins a core.
-    burner.arguments = ["-c", "sleep 8; while :; do :; done"]
+    burner.arguments = ["-c", "( sleep 30; kill $$ ) & sleep 8; while :; do :; done"]
     let launched = Date()
     try? burner.run()
     defer { burner.terminate() }
