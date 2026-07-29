@@ -126,6 +126,40 @@ import ProcessKit
     #expect(findings[0].severity == .urgent)
 }
 
+@Test func aRunawayIsVisibleBeforeItIsMinutesOld() {
+    // Observed on the machine, after the first attempt at this shipped: an
+    // orphaned /bin/sh at 97% for three and a half minutes still did not
+    // appear. The gate asked for sustained load over the long window, and that
+    // answer is nil until the process has existed for the whole of it — one
+    // interval reaching back past its birth is enough. So the first minutes of
+    // a runaway were exactly the minutes it stayed hidden, which is when
+    // somebody is staring at a hot laptop wondering what is going on.
+    let quiet = Fixtures.process(pid: 900, ppid: 1, path: "/usr/bin/python3",
+                                 args: ["python3", "idle.py"], ageHours: 5)
+    func burning(_ seconds: Double) -> ProcessSample {
+        ProcessSample(pid: 23070, ppid: 1, uid: 501, executablePath: "/bin/sh",
+                      arguments: ["/bin/sh", "-c", "while :; do :; done"],
+                      startedAt: Fixtures.now.addingTimeInterval(-130), hasControllingTTY: false,
+                      cpuTimeNanos: UInt64(seconds * 1_000_000_000), residentBytes: 1_048_576)
+    }
+
+    var history = History()
+    // Two samples from before it existed, then three with it pinning a core.
+    history.record(Fixtures.snapshot(processes: [quiet], at: Fixtures.now.addingTimeInterval(-240)))
+    history.record(Fixtures.snapshot(processes: [quiet], at: Fixtures.now.addingTimeInterval(-180)))
+    history.record(Fixtures.snapshot(processes: [quiet, burning(0)], at: Fixtures.now.addingTimeInterval(-120)))
+    history.record(Fixtures.snapshot(processes: [quiet, burning(60)], at: Fixtures.now.addingTimeInterval(-60)))
+    let latest = Fixtures.snapshot(processes: [quiet, burning(120)], at: Fixtures.now)
+    history.record(latest)
+
+    let findings = OrphanDetector().findings(in: latest, history: history, settings: Settings())
+
+    #expect(findings.count == 1)
+    #expect(findings[0].title == "sh")
+    // The idle one in the same directory is still nobody's business.
+    #expect(!findings.contains { $0.title == "python3" })
+}
+
 @Test func macOSsOwnBusyHelpersAreStillNotOrphans() {
     // The exception is only for the two directories that hold a person's own
     // tools. Spotlight's workers run as you, hang off launchd and are busy by

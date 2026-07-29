@@ -2,6 +2,23 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.5.1] — 2026-07-29
+
+### The runaway shell 0.5.0 promised to notice
+
+0.5.0 said it would show a shell burning a core. Driven on a real machine it
+did not: an orphaned `/bin/sh` at 97%, three and a half minutes in, still only
+turned up in the informational list at the bottom with no button on it.
+
+The rule asked whether the process had been busy across the same three-minute
+window every other rule uses, and that answer is nil until a process has
+existed for the whole of it — a single interval reaching back past its birth is
+enough to void it. So the first minutes of a runaway were exactly the minutes
+it stayed hidden, which is when somebody is sitting in front of a hot laptop
+wondering what is going on. It now asks the same question the "busy, but yours"
+list asks, over the same half minute, so one thing cannot be busy in one part
+of the panel and quiet in another.
+
 ## [0.5.0] — 2026-07-29
 
 ### It says what is keeping this Mac awake

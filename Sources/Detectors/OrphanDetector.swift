@@ -20,16 +20,25 @@ public struct OrphanDetector: Detector {
     /// an interrupted test run pinned a core each here for eight minutes, and
     /// this list is why nothing said so.
     private static let sharedPrefixes = ["/usr/bin/", "/bin/"]
+    /// Busy enough, for long enough, to be worth interrupting someone about —
+    /// the same bar the "busy, but yours" list uses, so one thing is not busy
+    /// in one part of the panel and quiet in another.
+    private static let busyWindow: TimeInterval = 30
+    private static let busyPercent: Double = 20
     /// Anything shipped inside a bundle is managed by whatever launched it.
     private static let bundleMarkers = [".app/Contents/", ".xpc/Contents/",
                                         ".appex/Contents/", ".framework/"]
 
     public func findings(in snapshot: Snapshot, history: History, settings: Settings) -> [Finding] {
         snapshot.processes.compactMap { process -> Finding? in
-            // Sustained, not a spike: a command that flares for one interval on
-            // its way out must not turn a skipped directory into a finding.
-            let busy = (history.sustainedCPU(pid: process.pid, over: settings.sustainedCPUWindow) ?? 0)
-                >= settings.sustainedCPUPercent
+            // The same question the panel's "busy, but yours" list asks, and
+            // deliberately not the longer window the other rules use: that
+            // answer is nil until a process has existed for the whole of it,
+            // because one interval reaching back past its birth is enough to
+            // void it. Asking it here hid a runaway for its first few minutes —
+            // which is precisely when somebody is looking at a hot laptop.
+            let busy = (history.sustainedCPU(pid: process.pid, over: Self.busyWindow) ?? 0)
+                >= Self.busyPercent
 
             guard process.uid == snapshot.currentUID,
                   process.pid != snapshot.ownPID,
