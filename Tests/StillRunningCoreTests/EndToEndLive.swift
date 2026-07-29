@@ -193,8 +193,16 @@ private var dockerIsRunning: Bool {
     let measured = history.cpuPercent(pid: pid) ?? 0
     print("burst read from a 0.6s gap: \(Int(fromTheGap))%, measured over five seconds: \(Int(measured))%")
 
-    #expect(fromTheGap > 70)
+    // The claim is the gulf between the two readings, not either figure on its
+    // own. How much of a core a shell loop wins depends on what else the machine
+    // is doing, and a bar of 70 was one a busy laptop could push it under: this
+    // read 69.08 during a build and then passed three times running once the
+    // machine was quiet, which is a test reporting the load rather than the bug.
+    #expect(fromTheGap > measured * 3)
     #expect(measured < 30)
+    // Low enough to survive a loaded machine, high enough that a burner which
+    // never really got scheduled cannot pass by keeping both numbers tiny.
+    #expect(fromTheGap > 40)
 }
 
 @Test func aRealCaffeinateIsReadOffTheRealAssertionTable() async {
