@@ -49,17 +49,17 @@ public enum WindowBehaviour {
         window.isRestorable = false
     }
 
-    /// Where the panel that opened Settings was hanging, so Settings can appear
-    /// in the same place. Anything else on screen belongs to the app itself —
-    /// with no Dock icon and no document windows, the only other window of any
-    /// size is the menu bar panel.
-    public static func panelFrame(among windows: [NSWindow], excluding id: String) -> CGRect? {
+    /// The menu bar panel itself: where Settings should appear, and the window
+    /// that should get out of the way once it has. Anything else on screen
+    /// belongs to the app itself — with no Dock icon and no document windows,
+    /// the only other window of any size is the panel hanging from the menu bar.
+    public static func menuBarPanel(among windows: [NSWindow], excluding id: String) -> NSWindow? {
         windows.first {
             $0.isVisible
                 && $0.identifier?.rawValue != id
                 && $0.frame.width >= 200
                 && $0.frame.height >= 200
-        }?.frame
+        }
     }
 
     /// Under the menu bar, right edge lined up with the panel it came from. A

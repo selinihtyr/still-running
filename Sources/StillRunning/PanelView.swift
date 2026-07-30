@@ -305,10 +305,15 @@ struct PanelView: View {
             .disabled(store.isRefreshing)
             .help("Check again")
             Button {
-                // Read before showing anything: this panel closes as soon as
-                // focus moves, and where it was hanging is where Settings goes.
-                let anchor = WindowBehaviour.panelFrame(
+                // This panel has done its job once Settings is up, and it no
+                // longer gets out of the way by itself: it used to close when
+                // opening Settings activated the app, and Settings deliberately
+                // no longer does that. So it is dismissed here, after its
+                // position has been noted — that is where Settings goes.
+                let menuBar = WindowBehaviour.menuBarPanel(
                     among: NSApp.windows, excluding: WindowBehaviour.settingsIdentifier)
+                let anchor = menuBar?.frame
+                menuBar?.orderOut(nil)
                 SettingsPanel.shared.show(store: store, anchor: anchor)
             } label: {
                 Image(systemName: "gearshape")
