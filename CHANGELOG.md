@@ -2,6 +2,43 @@
 
 What changed, in the words of someone using it rather than someone writing it.
 
+## [0.6.0] — 2026-07-30
+
+### Settings really does stay on the desktop you are on
+
+0.5.3 said this was fixed. It was not. Opening Settings from a full-screen
+window still slid the whole screen somewhere else, and the reason the last
+attempt failed is worth writing down: AppKit does not put the ban back at some
+moment you can wait out and undo. It puts it back as part of showing the
+window. Measured on the machine — 131330 the instant before, 131586 the instant
+after, whichever point the flag was cleared at. A fixed-size SwiftUI window
+cannot be talked out of it.
+
+So Settings is no longer one. It is a panel this app makes itself, allowed on
+every Space, kept out of the window restoration that remembers which desktop it
+was last on, and shown without the app taking over the foreground. Nothing is
+being wrestled with any more: the window is told what it is once and keeps it.
+
+It also no longer opens in the middle of the screen. It appears where the menu
+bar panel was hanging, under the icon you clicked, and that panel now closes as
+Settings opens instead of the two sitting on top of each other.
+
+### A settings window worth reading
+
+The window has been rebuilt around three questions, in the order you would ask
+them: what counts as forgotten, how the app tells you, and the app itself. Each
+is a card with its own heading, controls sit on the right where they line up
+with each other, and the sentence explaining a setting sits under it in grey
+rather than in a paragraph you have to work through first.
+
+The threshold picker now reads back what it is doing while you move it — "4
+things are listed right now" — so choosing a number is a decision you can see
+the result of rather than a guess. The one orange line in the window is still
+reserved for notifications being switched on with nowhere to arrive.
+
+The window is dark whichever way the system is set, title bar included, because
+that is what it was designed against.
+
 ## [0.5.3] — 2026-07-29
 
 ### Settings stops throwing you onto another desktop
