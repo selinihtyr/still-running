@@ -62,6 +62,9 @@ public struct UpdateChecker: Sendable {
     public static let releasesAPI = URL(string:
         "https://api.github.com/repos/selinihtyr/still-running/releases/latest")!
 
+    /// Where the app came from, for anyone who wants to read it or star it.
+    public static let repository = URL(string: "https://github.com/selinihtyr/still-running")!
+
     private let currentVersion: String
     private let fetch: Fetch
 

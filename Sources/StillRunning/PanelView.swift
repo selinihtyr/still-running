@@ -5,7 +5,6 @@ import StillRunningCore
 
 struct PanelView: View {
     @Bindable var store: Store
-    @Environment(\.openWindow) private var openWindow
     @State private var confirmingStopAll = false
 
     private var grouped: [(section: String, findings: [Finding])] {
@@ -148,7 +147,7 @@ struct PanelView: View {
                             }
                         }
                     }
-                    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                    .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
                     .padding(.horizontal, 8)
                 }
             }
@@ -306,16 +305,11 @@ struct PanelView: View {
             .disabled(store.isRefreshing)
             .help("Check again")
             Button {
-                openWindow(id: "settings")
-                // After the window is on screen, never before: showing it is
-                // when AppKit puts back the ban that drags you to another Space.
-                // This is also the only path that reaches a window being opened
-                // a second time, where nothing is attached and nothing fires.
-                if let settings = WindowBehaviour.window(withIdentifier: "settings",
-                                                         among: NSApp.windows) {
-                    WindowBehaviour.followTheActiveSpace(settings)
-                }
-                NSApp.activate(ignoringOtherApps: true)
+                // Read before showing anything: this panel closes as soon as
+                // focus moves, and where it was hanging is where Settings goes.
+                let anchor = WindowBehaviour.panelFrame(
+                    among: NSApp.windows, excluding: WindowBehaviour.settingsIdentifier)
+                SettingsPanel.shared.show(store: store, anchor: anchor)
             } label: {
                 Image(systemName: "gearshape")
                     .frame(width: 16, height: 16)

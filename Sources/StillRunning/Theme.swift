@@ -6,8 +6,16 @@ import Detectors
 /// means the same thing at a glance.
 enum Theme {
     static let panelWidth: CGFloat = 390
+    static let settingsWidth: CGFloat = 480
+    static let settingsHeight: CGFloat = 640
     static let rowSpacing: CGFloat = 10
     static let cardRadius: CGFloat = 11
+
+    /// Rows sit on a card, in the panel and in Settings alike. The fill barely
+    /// registers against a window's own background, so the edge is what makes a
+    /// group read as one thing; the panel gets both too, for one idiom.
+    static let cardFill = Color.primary.opacity(0.04)
+    static let cardEdge = Color.primary.opacity(0.09)
 
     /// Colour carries kind, so a glance at an icon or a rail says what sort of
     /// thing this is. Amber overrides everything: it only ever means "this one
@@ -63,4 +71,6 @@ extension Font {
     static let figureLarge = Font.system(size: 13, weight: .semibold).monospacedDigit()
     static let rowTitle = Font.system(size: 13, weight: .medium)
     static let rowDetail = Font.system(size: 11)
+    /// A small live figure under a setting: same digit width as the panel's.
+    static let readout = Font.system(size: 11, weight: .medium).monospacedDigit()
 }
